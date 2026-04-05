@@ -176,9 +176,7 @@ const WORD_BANK: Record<Difficulty, LexiconItem[]> = {
   ],
 };
 
-const ROUND_MS = 3000;
-const MIN_ROUND_SECONDS = 3;
-const MAX_ROUND_SECONDS = 30;
+const ROUND_MS = 30000;
 const STUDY_HISTORY_STORAGE_KEY = "english_voice_game_study_history_v1";
 const STUDY_BATCH_STORAGE_KEY = "english_voice_game_study_batch_v1";
 
@@ -284,25 +282,25 @@ export default function HomePage() {
 
   const [wordInput, setWordInput] = useState(DEFAULT_WORDS);
   const [words, setWords] = useState<WordItem[]>([]);
-  const [playMode, setPlayMode] = useState<PlayMode>("voice_match");
+  const [playMode, setPlayMode] = useState<PlayMode>("plane_shooter");
   const [gameState, setGameState] = useState<GameState>("idle");
   const [targetId, setTargetId] = useState<string | null>(null);
   const [planeTargetId, setPlaneTargetId] = useState<string | null>(null);
-  const [recognizedText, setRecognizedText] = useState("");
+  const [, setRecognizedText] = useState("");
   const [countdownMs, setCountdownMs] = useState(ROUND_MS);
-  const [roundSeconds, setRoundSeconds] = useState(3);
-  const [fallHeightPx, setFallHeightPx] = useState(520);
+  const [roundSeconds, setRoundSeconds] = useState(30);
+  const [fallHeightPx] = useState(600);
   const [planeDropChineseOnly, setPlaneDropChineseOnly] = useState(false);
   const [difficulty, setDifficulty] = useState<Difficulty>("easy");
   const [generateCount, setGenerateCount] = useState(8);
   const [totalCount, setTotalCount] = useState(0);
   const [doneCount, setDoneCount] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
-  const [speechSupported, setSpeechSupported] = useState(true);
+  const [, setSpeechSupported] = useState(true);
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
   const [timeBoost, setTimeBoost] = useState(0);
-  const [feedbackText, setFeedbackText] = useState("准备好开口说英语了吗？");
+  const [, setFeedbackText] = useState("准备好开口说英语了吗？");
   const [likeBursts, setLikeBursts] = useState<LikeBurst[]>([]);
   const [mistakeMap, setMistakeMap] = useState<Record<string, MistakeRecord>>({});
   const [studyHistoryMap, setStudyHistoryMap] = useState<Record<string, StudyHistoryRecord>>({});
@@ -316,14 +314,14 @@ export default function HomePage() {
   const [startAfterOpen, setStartAfterOpen] = useState(false);
 
   const wordsRef = useRef<WordItem[]>([]);
-  const playModeRef = useRef<PlayMode>("voice_match");
+  const playModeRef = useRef<PlayMode>("plane_shooter");
   const planeXRef = useRef(240);
   const planeTargetIdRef = useRef<string | null>(null);
   const planeMoveDirRef = useRef<-1 | 0 | 1>(0);
   const leftPressedRef = useRef(false);
   const rightPressedRef = useRef(false);
   const lastFireTsRef = useRef(0);
-  const fallHeightRef = useRef(520);
+  const fallHeightRef = useRef(600);
   const roundStartRef = useRef(0);
   const lastFrameTsRef = useRef<number | null>(null);
   const ttsTimerRef = useRef<number | null>(null);
@@ -331,7 +329,7 @@ export default function HomePage() {
   const askingRef = useRef(false);
   const targetRef = useRef<string | null>(null);
   const spaceHoldRef = useRef(false);
-  const [isHoldingSpace, setIsHoldingSpace] = useState(false);
+  const [, setIsHoldingSpace] = useState(false);
 
   const currentMeaning = useMemo(() => {
     if (!targetId) return gameState === "running" ? "准备下一题..." : "点击开始游戏";
@@ -343,14 +341,6 @@ export default function HomePage() {
   const mistakeList = useMemo(
     () => Object.values(mistakeMap).sort((a, b) => b.count - a.count),
     [mistakeMap],
-  );
-  const studyHistoryList = useMemo(
-    () =>
-      Object.values(studyHistoryMap).sort((a, b) => {
-        if (b.lastStudiedAt !== a.lastStudiedAt) return b.lastStudiedAt - a.lastStudiedAt;
-        return (b.wrongCount - b.correctCount) - (a.wrongCount - a.correctCount);
-      }),
-    [studyHistoryMap],
   );
   const studyBatchList = useMemo(
     () =>
@@ -1032,21 +1022,6 @@ export default function HomePage() {
     setFeedbackText(`已载入 ${mistakeList.length} 条错题词库，可直接开始专项练习`);
   }, [mistakeList]);
 
-  const loadStudyHistoryPractice = useCallback(
-    (onlyWrong: boolean) => {
-      const source = onlyWrong
-        ? studyHistoryList.filter((x) => x.wrongCount > 0)
-        : studyHistoryList;
-      if (!source.length) return;
-      const lines = source.slice(0, 120).map((x) => `${x.en}=${x.zh}`).join("\n");
-      setWordInput(lines);
-      setFeedbackText(
-        `已载入 ${Math.min(source.length, 120)} 条${onlyWrong ? "高错词" : "学习历史"}复习词库`,
-      );
-    },
-    [studyHistoryList],
-  );
-
   const loadBatchPractice = useCallback(
     (batchId: string) => {
       const batch = studyBatchMap[batchId];
@@ -1496,23 +1471,6 @@ export default function HomePage() {
             </div>
             {playMode === "plane_shooter" ? (
               <div className="mt-2 space-y-2 text-xs text-indigo-100/90">
-                <div className="flex items-center gap-2">
-                  <label htmlFor="fallHeight">下坠总高度(px)</label>
-                  <input
-                    id="fallHeight"
-                    type="number"
-                    min={220}
-                    max={1400}
-                    value={fallHeightPx}
-                    onChange={(e) => {
-                      const value = Number(e.target.value);
-                      if (!Number.isFinite(value)) return;
-                      setFallHeightPx(clamp(Math.floor(value), 220, 1400));
-                    }}
-                    className="w-24 rounded-lg border border-indigo-300/35 bg-slate-900/90 px-2 py-1 text-sm text-white outline-none"
-                  />
-                  <span className="text-indigo-200/80">范围 220-1400</span>
-                </div>
                 <label className="inline-flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -1525,18 +1483,21 @@ export default function HomePage() {
                 </label>
               </div>
             ) : null}
+            {playMode === "plane_shooter" ? (
+              <p className="mt-2 text-xs text-sky-200">
+                操作：中文下落，按住空格说英文锁定红色目标；左右方向键移动；上方向键发射。
+              </p>
+            ) : null}
             <div className="mt-2 flex items-center gap-2 text-xs text-indigo-100/90">
               <label htmlFor="roundSeconds">每题倒计时（秒）</label>
               <input
                 id="roundSeconds"
                 type="number"
-                min={MIN_ROUND_SECONDS}
-                max={MAX_ROUND_SECONDS}
                 value={roundSeconds}
                 onChange={(e) => {
                   const value = Number(e.target.value);
                   if (!Number.isFinite(value)) return;
-                  const next = Math.max(MIN_ROUND_SECONDS, Math.min(MAX_ROUND_SECONDS, Math.floor(value)));
+                  const next = Math.max(1, Math.floor(value));
                   setRoundSeconds(next);
                   if (gameState !== "running") {
                     roundDurationRef.current = next * 1000;
@@ -1545,7 +1506,7 @@ export default function HomePage() {
                 }}
                 className="w-20 rounded-lg border border-indigo-300/35 bg-slate-900/90 px-2 py-1 text-sm text-white outline-none"
               />
-              <span className="text-indigo-200/80">范围 {MIN_ROUND_SECONDS}-{MAX_ROUND_SECONDS}</span>
+              <span className="text-indigo-200/80">可自由设置</span>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2">
               <button
@@ -1622,31 +1583,8 @@ export default function HomePage() {
               <StatCard label="总题数" value={totalCount} />
               <StatCard label="已完成" value={doneCount} />
               <StatCard label={playMode === "voice_match" ? "正确" : "击中"} value={playMode === "voice_match" ? correctCount : shooterHits} />
-              <StatCard label="倒计时" value={playMode === "voice_match" ? `${(countdownMs / 1000).toFixed(1)}s` : "--"} />
               <StatCard label="当前连击" value={streak} />
               <StatCard label="最高连击" value={bestStreak} />
-              <StatCard label="空格监听" value={isHoldingSpace ? "进行中" : "未按下"} />
-            </div>
-
-            <div className="mt-3 rounded-xl border border-indigo-300/35 bg-slate-950/90 p-3">
-              <p className="text-xs text-indigo-100/85">
-                {playMode === "voice_match" ? "请说出这个中文含义对应的英文：" : "请说出任意下落单词/词组的英文："}
-              </p>
-              <p className="mt-1 min-h-8 text-2xl font-bold tracking-wide text-white">
-                {playMode === "voice_match" ? currentMeaning : "飞机射击模式"}
-              </p>
-              <p className="mt-2 min-h-5 truncate text-xs text-emerald-200">{recognizedText}</p>
-              <p className="mt-1 min-h-5 text-xs text-amber-200">{feedbackText}</p>
-              <p className="mt-1 text-xs text-sky-200">
-                {playMode === "voice_match"
-                  ? "操作：按住空格开始识别，松开空格结束识别。"
-                  : planeDropChineseOnly
-                    ? "操作：中文下落，按住空格说英文锁定红色目标；左右方向键移动；上方向键发射。"
-                    : "操作：按住空格说词锁定红色目标；左右方向键移动飞机；上方向键发射子弹。"}
-              </p>
-              {!speechSupported ? (
-                <p className="mt-1 text-xs text-rose-200">浏览器不支持语音识别，请使用 Chrome 并允许麦克风权限。</p>
-              ) : null}
             </div>
 
             <div className="mt-3 rounded-xl border border-rose-300/30 bg-slate-950/80 p-3">
@@ -1688,57 +1626,6 @@ export default function HomePage() {
                   </div>
                 ) : (
                   <p className="text-xs text-rose-100/70">还没有错词记录，开始游戏后会自动累计。</p>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-3 rounded-xl border border-emerald-300/30 bg-slate-950/80 p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-xs text-emerald-100/90">学习历史（本地保存，便于复习）</p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => loadStudyHistoryPractice(false)}
-                    disabled={!studyHistoryList.length || gameState === "running"}
-                    className="rounded-lg border border-emerald-300/35 px-2 py-1 text-xs text-emerald-100 transition hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-45"
-                  >
-                    载入历史复习
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => loadStudyHistoryPractice(true)}
-                    disabled={!studyHistoryList.some((x) => x.wrongCount > 0) || gameState === "running"}
-                    className="rounded-lg border border-emerald-300/35 px-2 py-1 text-xs text-emerald-100 transition hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-45"
-                  >
-                    仅载入高错词
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setStudyHistoryMap({})}
-                    disabled={!studyHistoryList.length}
-                    className="rounded-lg border border-emerald-300/35 px-2 py-1 text-xs text-emerald-100 transition hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-45"
-                  >
-                    清空历史
-                  </button>
-                </div>
-              </div>
-              <div className="max-h-28 overflow-y-auto pr-1">
-                {studyHistoryList.length ? (
-                  <div className="flex flex-wrap gap-2">
-                    {studyHistoryList.slice(0, 80).map((item) => (
-                      <button
-                        key={item.key}
-                        type="button"
-                        onClick={() => speakText(item.en)}
-                        className="rounded-full border border-emerald-300/40 bg-emerald-500/15 px-2.5 py-1 text-xs text-emerald-100 transition hover:bg-emerald-400/25"
-                        title={`${item.en} 学习${item.seenCount}次 ✓${item.correctCount} ✗${item.wrongCount}`}
-                      >
-                        {item.en} · 学习{item.seenCount}次
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-emerald-100/70">暂无历史，开始游戏后会自动记录已学单词。</p>
                 )}
               </div>
             </div>
