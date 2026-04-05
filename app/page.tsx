@@ -7,6 +7,7 @@ type WordItem = {
   en: string;
   zh: string;
   normalized: string;
+  revealedEn: boolean;
   x: number;
   vx: number;
   y: number;
@@ -262,6 +263,7 @@ function parseWordList(raw: string, width: number): WordItem[] {
       en,
       zh,
       normalized: normalizeText(en),
+      revealedEn: true,
       x,
       vx: 0,
       y: -40 - Math.random() * 220,
@@ -285,10 +287,12 @@ export default function HomePage() {
   const [playMode, setPlayMode] = useState<PlayMode>("voice_match");
   const [gameState, setGameState] = useState<GameState>("idle");
   const [targetId, setTargetId] = useState<string | null>(null);
+  const [planeTargetId, setPlaneTargetId] = useState<string | null>(null);
   const [recognizedText, setRecognizedText] = useState("");
   const [countdownMs, setCountdownMs] = useState(ROUND_MS);
   const [roundSeconds, setRoundSeconds] = useState(3);
   const [fallHeightPx, setFallHeightPx] = useState(520);
+  const [planeDropChineseOnly, setPlaneDropChineseOnly] = useState(false);
   const [difficulty, setDifficulty] = useState<Difficulty>("easy");
   const [generateCount, setGenerateCount] = useState(8);
   const [totalCount, setTotalCount] = useState(0);
@@ -306,19 +310,23 @@ export default function HomePage() {
   const [ttsVoices, setTtsVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedVoiceURI, setSelectedVoiceURI] = useState("");
   const [planeX, setPlaneX] = useState(240);
-  const [planeTargetX, setPlaneTargetX] = useState(240);
   const [bullets, setBullets] = useState<Bullet[]>([]);
   const [shooterHits, setShooterHits] = useState(0);
+  const [isGameModalOpen, setIsGameModalOpen] = useState(false);
+  const [startAfterOpen, setStartAfterOpen] = useState(false);
 
   const wordsRef = useRef<WordItem[]>([]);
   const playModeRef = useRef<PlayMode>("voice_match");
   const planeXRef = useRef(240);
-  const planeTargetXRef = useRef(240);
+  const planeTargetIdRef = useRef<string | null>(null);
+  const planeMoveDirRef = useRef<-1 | 0 | 1>(0);
+  const leftPressedRef = useRef(false);
+  const rightPressedRef = useRef(false);
+  const lastFireTsRef = useRef(0);
   const fallHeightRef = useRef(520);
   const roundStartRef = useRef(0);
   const lastFrameTsRef = useRef<number | null>(null);
   const ttsTimerRef = useRef<number | null>(null);
-  const pendingShotTargetRef = useRef<string | null>(null);
   const currentBatchIdRef = useRef<string | null>(null);
   const askingRef = useRef(false);
   const targetRef = useRef<string | null>(null);
@@ -363,8 +371,8 @@ export default function HomePage() {
   }, [planeX]);
 
   useEffect(() => {
-    planeTargetXRef.current = planeTargetX;
-  }, [planeTargetX]);
+    planeTargetIdRef.current = planeTargetId;
+  }, [planeTargetId]);
 
   useEffect(() => {
     fallHeightRef.current = fallHeightPx;
@@ -589,15 +597,98 @@ export default function HomePage() {
     speakNow();
   }, [selectedVoiceURI, ttsVoices]);
 
-  const triggerPlaneShot = useCallback((target: WordItem) => {
-    if (!gameAreaRef.current) return;
-    const areaW = gameAreaRef.current.clientWidth;
-    const toX = clamp(target.x + 24, 24, Math.max(24, areaW - 24));
-    setPlaneTargetX(toX);
-    planeTargetXRef.current = toX;
-    pendingShotTargetRef.current = target.id;
-    setFeedbackText(`锁定 ${target.en}，飞机射击中`);
+  const lockPlaneTarget = useCallback((target: WordItem) => {
+    setWords((prev) => {
+      const updated = prev.map((w) =>
+        w.id === target.id ? { ...w, revealedEn: true } : w,
+      );
+      wordsRef.current = updated;
+      return updated;
+    });
+    setPlaneTargetId(target.id);
+    planeTargetIdRef.current = target.id;
+    setFeedbackText(`已锁定红色目标：${target.en}。左右键移动，上方向键发射`);
   }, []);
+
+  const clearPlaneTarget = useCallback(() => {
+    setPlaneTargetId(null);
+    planeTargetIdRef.current = null;
+  }, []);
+
+  const hitPlaneTarget = useCallback((targetIdToHit: string): boolean => {
+    const hitWord = wordsRef.current.find((w) => w.id === targetIdToHit && w.status === "live");
+    if (!hitWord) return false;
+
+    setWords((old) => {
+      let didHit = false;
+      const updated: WordItem[] = old.map((w) => {
+        if (w.id === targetIdToHit && w.status === "live") {
+          didHit = true;
+          return { ...w, status: "hit" as const, exploding: true };
+        }
+        return w;
+      });
+      if (!didHit) return old;
+      wordsRef.current = updated;
+      return updated;
+    });
+
+    window.setTimeout(() => {
+      setWords((old) => {
+        const updated: WordItem[] = old.map((w) =>
+          w.id === targetIdToHit ? { ...w, exploding: false } : w,
+        );
+        wordsRef.current = updated;
+        return updated;
+      });
+    }, 360);
+
+    if (planeTargetIdRef.current === targetIdToHit) {
+      clearPlaneTarget();
+    }
+    emitLikeBurst();
+    bumpStudyHistory({ en: hitWord.en, zh: hitWord.zh }, "correct");
+    bumpBatchResult("correct");
+    setShooterHits((v) => v + 1);
+    setDoneCount((v) => v + 1);
+    setFeedbackText(`命中 ${hitWord.en}！继续语音锁定下一个红色目标`);
+    return true;
+  }, [bumpBatchResult, bumpStudyHistory, clearPlaneTarget, emitLikeBurst]);
+
+  const firePlaneBullet = useCallback(() => {
+    if (playModeRef.current !== "plane_shooter" || gameState !== "running") return;
+    if (!gameAreaRef.current) return;
+
+    const currentTargetId = planeTargetIdRef.current;
+    if (!currentTargetId) {
+      setFeedbackText("请先按住空格说出单词，锁定红色目标");
+      return;
+    }
+    const targetAlive = wordsRef.current.some(
+      (w) => w.id === currentTargetId && w.status === "live",
+    );
+    if (!targetAlive) {
+      clearPlaneTarget();
+      setFeedbackText("目标已消失，请重新语音锁定");
+      return;
+    }
+
+    const now = performance.now();
+    if (now - lastFireTsRef.current < 140) return;
+    lastFireTsRef.current = now;
+
+    const areaH = gameAreaRef.current.clientHeight;
+    setBullets((prev) => [
+      ...prev,
+      {
+        id: `${Date.now()}-${Math.random()}`,
+        x: planeXRef.current,
+        y: areaH - 34,
+        speed: 900,
+        targetId: currentTargetId,
+      },
+    ]);
+  }, [clearPlaneTarget, gameState]);
 
   const stopSpeech = useCallback(() => {
     const rec = speechRef.current;
@@ -757,12 +848,12 @@ export default function HomePage() {
             c.normalized.includes(normalized),
         );
         if (containsCandidate) {
-          triggerPlaneShot(containsCandidate);
+          lockPlaneTarget(containsCandidate);
           return;
         }
 
         if (bestShooter.score >= 0.58) {
-          triggerPlaneShot(bestShooter.word);
+          lockPlaneTarget(bestShooter.word);
           return;
         }
 
@@ -805,7 +896,7 @@ export default function HomePage() {
         setFeedbackText(`你说的是 "${matchedWord.en}"，本题目标是 "${target.en}"`);
       }
     },
-    [playMode, triggerPlaneShot, resolveRound],
+    [lockPlaneTarget, playMode, resolveRound],
   );
 
   const startSpeech = useCallback(() => {
@@ -826,7 +917,9 @@ export default function HomePage() {
 
     // 受限识别：注入当前候选词，降低跑偏概率。
     const liveWords = wordsRef.current;
-    const target = liveWords.find((w) => w.id === targetRef.current);
+    const focusId =
+      playModeRef.current === "plane_shooter" ? planeTargetIdRef.current : targetRef.current;
+    const target = liveWords.find((w) => w.id === focusId);
     const live = liveWords.filter((w) => w.status === "live");
     const grammarTerms = [
       ...live.map((w) => w.en),
@@ -880,14 +973,19 @@ export default function HomePage() {
   const endGame = useCallback(() => {
     setGameState("ended");
     setTargetId(null);
+    setPlaneTargetId(null);
     targetRef.current = null;
+    planeTargetIdRef.current = null;
     askingRef.current = false;
     spaceHoldRef.current = false;
+    planeMoveDirRef.current = 0;
+    leftPressedRef.current = false;
+    rightPressedRef.current = false;
+    lastFireTsRef.current = 0;
     setIsHoldingSpace(false);
     setRecognizedText("");
     setCountdownMs(0);
     setBullets([]);
-    pendingShotTargetRef.current = null;
     currentBatchIdRef.current = null;
     lastFrameTsRef.current = null;
     clearRaf();
@@ -967,87 +1065,46 @@ export default function HomePage() {
       const mode = playModeRef.current;
 
       if (mode === "plane_shooter") {
-        let desiredPlaneX = planeTargetXRef.current;
-        const pendingId = pendingShotTargetRef.current;
-        if (pendingId) {
-          const pendingTarget = wordsRef.current.find((w) => w.id === pendingId && w.status === "live");
-          if (pendingTarget) {
-            const areaW = gameAreaRef.current?.clientWidth ?? 900;
-            desiredPlaneX = clamp(pendingTarget.x + 24, 24, Math.max(24, areaW - 24));
-            setPlaneTargetX(desiredPlaneX);
-            planeTargetXRef.current = desiredPlaneX;
-          } else {
-            pendingShotTargetRef.current = null;
-          }
-        }
-
-        let nextPlaneX = planeXRef.current;
-        setPlaneX((prev) => {
-          const step = 760 * deltaSec;
-          const delta = desiredPlaneX - prev;
-          if (Math.abs(delta) <= step) {
-            nextPlaneX = desiredPlaneX;
-            planeXRef.current = desiredPlaneX;
-            return desiredPlaneX;
-          }
-          const v = prev + Math.sign(delta) * step;
-          nextPlaneX = v;
-          planeXRef.current = v;
-          return v;
-        });
-
-        const shootTarget = pendingShotTargetRef.current;
-        if (shootTarget && Math.abs(nextPlaneX - desiredPlaneX) < 12) {
-          const areaH = gameAreaRef.current?.clientHeight ?? 500;
-          setBullets((prev) => [
-            ...prev,
-            { id: `${Date.now()}-${Math.random()}`, x: nextPlaneX, y: areaH - 34, speed: 760, targetId: shootTarget },
-          ]);
-          pendingShotTargetRef.current = null;
+        const areaW = gameAreaRef.current?.clientWidth ?? 900;
+        const nextPlaneX = clamp(
+          planeXRef.current + planeMoveDirRef.current * 560 * deltaSec,
+          24,
+          Math.max(24, areaW - 24),
+        );
+        if (Math.abs(nextPlaneX - planeXRef.current) > 0.1) {
+          planeXRef.current = nextPlaneX;
+          setPlaneX(nextPlaneX);
         }
 
         setBullets((prev) => {
+          const resolvedHits = new Set<string>();
           const moved: Bullet[] = [];
           for (const b of prev) {
+            const ny = b.y - b.speed * deltaSec;
+            if (ny < -28) continue;
+
+            const isCurrentRedTarget = b.targetId === planeTargetIdRef.current;
             const target = wordsRef.current.find((w) => w.id === b.targetId && w.status === "live");
-            if (!target) continue;
-
-            const tx = target.x + 24;
-            const ty = target.y + 6;
-            const dx = tx - b.x;
-            const dy = ty - b.y;
-            const dist = Math.hypot(dx, dy);
-            const step = b.speed * deltaSec;
-
-            if (dist < 24 || step >= dist) {
-              setWords((old) => {
-                const updated: WordItem[] = old.map((w) =>
-                  w.id === b.targetId ? { ...w, status: "hit" as const, exploding: true } : w,
-                );
-                wordsRef.current = updated;
-                return updated;
-              });
-              setTimeout(() => {
-                setWords((old) => {
-                  const updated: WordItem[] = old.map((w) =>
-                    w.id === b.targetId ? { ...w, exploding: false } : w,
-                  );
-                  wordsRef.current = updated;
-                  return updated;
-                });
-              }, 360);
-              emitLikeBurst();
-              bumpStudyHistory({ en: target.en, zh: target.zh }, "correct");
-              bumpBatchResult("correct");
-              setShooterHits((v) => v + 1);
-              setDoneCount((v) => v + 1);
-              setFeedbackText(`命中 ${target.en}！`);
+            if (!isCurrentRedTarget || !target) {
+              moved.push({ ...b, y: ny });
               continue;
             }
 
-            const nx = b.x + (dx / dist) * step;
-            const ny = b.y + (dy / dist) * step;
-            moved.push({ ...b, x: nx, y: ny });
+            const targetCenterX = target.x + 44;
+            const targetCenterY = target.y + 14;
+            const isHit =
+              Math.abs(b.x - targetCenterX) <= 48 &&
+              Math.abs(ny - targetCenterY) <= 24;
+
+            if (isHit) {
+              if (!resolvedHits.has(b.targetId)) {
+                resolvedHits.add(b.targetId);
+                hitPlaneTarget(b.targetId);
+              }
+              continue;
+            }
+
+            moved.push({ ...b, y: ny });
           }
           return moved;
         });
@@ -1087,6 +1144,10 @@ export default function HomePage() {
             if (mode === "voice_match" && w.id === targetRef.current) {
               targetDropped = true;
             } else if (mode === "plane_shooter") {
+              if (w.id === planeTargetIdRef.current) {
+                clearPlaneTarget();
+                setFeedbackText(`目标 ${w.en} 已掉落，请重新语音锁定`);
+              }
               setDoneCount((v) => v + 1);
               bumpStudyHistory({ en: w.en, zh: w.zh }, "wrong");
               bumpBatchResult("wrong");
@@ -1137,7 +1198,7 @@ export default function HomePage() {
 
       rafRef.current = requestAnimationFrame(gameLoop);
     },
-    [bumpBatchResult, bumpStudyHistory, emitLikeBurst, endGame, resolveRound],
+    [bumpBatchResult, bumpStudyHistory, clearPlaneTarget, endGame, hitPlaneTarget, resolveRound],
   );
 
   const startGame = useCallback(() => {
@@ -1160,31 +1221,47 @@ export default function HomePage() {
     setStreak(0);
     setBestStreak(0);
     setTimeBoost(0);
-    setFeedbackText(playMode === "voice_match" ? "开局成功，准备进入第一题" : "按住空格并说出下落中的英文，飞机会自动射击");
+    setFeedbackText(
+      playMode === "voice_match"
+        ? "开局成功，准备进入第一题"
+        : planeDropChineseOnly
+          ? "中文下落模式：按住空格说英文，目标会变红；再用左右键移动、上方向键发射"
+          : "按住空格说出单词锁定红色目标，再用左右键移动飞机、上方向键发射",
+    );
     setRecognizedText("");
     setShooterHits(0);
     setBullets([]);
+    setPlaneTargetId(null);
     lastFrameTsRef.current = null;
-    pendingShotTargetRef.current = null;
+    planeTargetIdRef.current = null;
+    planeMoveDirRef.current = 0;
+    leftPressedRef.current = false;
+    rightPressedRef.current = false;
+    lastFireTsRef.current = 0;
     playModeRef.current = playMode;
     fallHeightRef.current = fallHeightPx;
     const areaW = gameAreaRef.current?.clientWidth ?? 900;
     setPlaneX(areaW / 2);
-    setPlaneTargetX(areaW / 2);
     planeXRef.current = areaW / 2;
-    planeTargetXRef.current = areaW / 2;
 
     const gameHeight = gameAreaRef.current?.clientHeight ?? 500;
     const fallDistance = playMode === "plane_shooter" ? Math.max(220, fallHeightPx) : Math.max(60, gameHeight - 24);
     const baseSpeed = fallDistance / roundSeconds;
+    const revealByDefault = !(playMode === "plane_shooter" && planeDropChineseOnly);
     const syncedWords = parsed.map((w, idx) => {
       if (playMode === "plane_shooter") {
         const laneX = ((idx % 8) + 1) * (areaW / 9);
         const vx = (Math.random() < 0.5 ? -1 : 1) * (40 + Math.random() * 120);
         const speed = baseSpeed * (0.75 + Math.random() * 0.7);
-        return { ...w, x: clamp(laneX, 6, areaW - 100), vx, speed };
+        return {
+          ...w,
+          revealedEn: revealByDefault,
+          x: clamp(laneX, 6, areaW - 100),
+          vx,
+          speed,
+        };
       }
-      return { ...w, vx: 0, speed: baseSpeed };
+      return { ...w, revealedEn: true, vx: 0, speed: baseSpeed };
     });
     setWords(syncedWords);
     wordsRef.current = syncedWords;
@@ -1201,11 +1278,42 @@ export default function HomePage() {
 
     clearRaf();
     rafRef.current = requestAnimationFrame(gameLoop);
-  }, [wordInput, playMode, fallHeightPx, addSeenHistoryBatch, registerStudyBatch, nextRound, clearRaf, gameLoop, roundSeconds]);
+  }, [wordInput, playMode, fallHeightPx, addSeenHistoryBatch, registerStudyBatch, nextRound, clearRaf, gameLoop, roundSeconds, planeDropChineseOnly]);
 
   const stopGame = useCallback(() => {
     endGame();
   }, [endGame]);
+
+  const openGameModalAndStart = useCallback(() => {
+    const width = gameAreaRef.current?.clientWidth ?? 900;
+    const parsed = parseWordList(wordInput, width);
+    if (parsed.length < 3) {
+      window.alert("请至少输入 3 条有效词条，格式：英文=中文");
+      return;
+    }
+
+    setIsGameModalOpen(true);
+    setStartAfterOpen(true);
+  }, [wordInput]);
+
+  const closeGameModal = useCallback(() => {
+    if (gameState === "running") {
+      endGame();
+    }
+    setStartAfterOpen(false);
+    setIsGameModalOpen(false);
+  }, [endGame, gameState]);
+
+  useEffect(() => {
+    if (!isGameModalOpen || !startAfterOpen) return;
+
+    const id = requestAnimationFrame(() => {
+      setStartAfterOpen(false);
+      startGame();
+    });
+
+    return () => cancelAnimationFrame(id);
+  }, [isGameModalOpen, startAfterOpen, startGame]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
@@ -1235,9 +1343,29 @@ export default function HomePage() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.code !== "Space") return;
       const activeTag = (document.activeElement as HTMLElement | null)?.tagName;
       if (activeTag === "INPUT" || activeTag === "TEXTAREA") return;
+
+      if (event.code === "ArrowLeft" || event.code === "ArrowRight" || event.code === "ArrowUp") {
+        if (gameState !== "running" || playMode !== "plane_shooter") return;
+        event.preventDefault();
+        if (event.code === "ArrowLeft") {
+          leftPressedRef.current = true;
+          planeMoveDirRef.current = rightPressedRef.current ? 0 : -1;
+          return;
+        }
+        if (event.code === "ArrowRight") {
+          rightPressedRef.current = true;
+          planeMoveDirRef.current = leftPressedRef.current ? 0 : 1;
+          return;
+        }
+        if (!event.repeat) {
+          firePlaneBullet();
+        }
+        return;
+      }
+
+      if (event.code !== "Space") return;
       if (event.repeat) return;
       event.preventDefault();
       const canListen =
@@ -1251,6 +1379,18 @@ export default function HomePage() {
     };
 
     const onKeyUp = (event: KeyboardEvent) => {
+      if (event.code === "ArrowLeft" || event.code === "ArrowRight") {
+        if (gameState !== "running" || playMode !== "plane_shooter") return;
+        event.preventDefault();
+        if (event.code === "ArrowLeft") {
+          leftPressedRef.current = false;
+        } else {
+          rightPressedRef.current = false;
+        }
+        planeMoveDirRef.current = leftPressedRef.current ? -1 : rightPressedRef.current ? 1 : 0;
+        return;
+      }
+
       if (event.code !== "Space") return;
       event.preventDefault();
       spaceHoldRef.current = false;
@@ -1267,7 +1407,7 @@ export default function HomePage() {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
     };
-  }, [gameState, playMode, startSpeech, stopSpeech]);
+  }, [firePlaneBullet, gameState, playMode, startSpeech, stopSpeech]);
 
   useEffect(() => {
     return () => {
@@ -1355,22 +1495,34 @@ export default function HomePage() {
               </button>
             </div>
             {playMode === "plane_shooter" ? (
-              <div className="mt-2 flex items-center gap-2 text-xs text-indigo-100/90">
-                <label htmlFor="fallHeight">下坠总高度(px)</label>
-                <input
-                  id="fallHeight"
-                  type="number"
-                  min={220}
-                  max={1400}
-                  value={fallHeightPx}
-                  onChange={(e) => {
-                    const value = Number(e.target.value);
-                    if (!Number.isFinite(value)) return;
-                    setFallHeightPx(clamp(Math.floor(value), 220, 1400));
-                  }}
-                  className="w-24 rounded-lg border border-indigo-300/35 bg-slate-900/90 px-2 py-1 text-sm text-white outline-none"
-                />
-                <span className="text-indigo-200/80">范围 220-1400</span>
+              <div className="mt-2 space-y-2 text-xs text-indigo-100/90">
+                <div className="flex items-center gap-2">
+                  <label htmlFor="fallHeight">下坠总高度(px)</label>
+                  <input
+                    id="fallHeight"
+                    type="number"
+                    min={220}
+                    max={1400}
+                    value={fallHeightPx}
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      if (!Number.isFinite(value)) return;
+                      setFallHeightPx(clamp(Math.floor(value), 220, 1400));
+                    }}
+                    className="w-24 rounded-lg border border-indigo-300/35 bg-slate-900/90 px-2 py-1 text-sm text-white outline-none"
+                  />
+                  <span className="text-indigo-200/80">范围 220-1400</span>
+                </div>
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={planeDropChineseOnly}
+                    onChange={(e) => setPlaneDropChineseOnly(e.target.checked)}
+                    disabled={gameState === "running"}
+                    className="h-4 w-4 rounded border-indigo-300/40 bg-slate-900/90 accent-emerald-400 disabled:opacity-50"
+                  />
+                  <span>中文下落模式（先显示中文，说对英文后变英文并变红可射击）</span>
+                </label>
               </div>
             ) : null}
             <div className="mt-2 flex items-center gap-2 text-xs text-indigo-100/90">
@@ -1398,7 +1550,7 @@ export default function HomePage() {
             <div className="mt-3 grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={startGame}
+                onClick={openGameModalAndStart}
                 disabled={gameState === "running"}
                 className="rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-55"
               >
@@ -1485,7 +1637,13 @@ export default function HomePage() {
               </p>
               <p className="mt-2 min-h-5 truncate text-xs text-emerald-200">{recognizedText}</p>
               <p className="mt-1 min-h-5 text-xs text-amber-200">{feedbackText}</p>
-              <p className="mt-1 text-xs text-sky-200">操作：按住空格开始识别，松开空格结束识别。</p>
+              <p className="mt-1 text-xs text-sky-200">
+                {playMode === "voice_match"
+                  ? "操作：按住空格开始识别，松开空格结束识别。"
+                  : planeDropChineseOnly
+                    ? "操作：中文下落，按住空格说英文锁定红色目标；左右方向键移动；上方向键发射。"
+                    : "操作：按住空格说词锁定红色目标；左右方向键移动飞机；上方向键发射子弹。"}
+              </p>
               {!speechSupported ? (
                 <p className="mt-1 text-xs text-rose-200">浏览器不支持语音识别，请使用 Chrome 并允许麦克风权限。</p>
               ) : null}
@@ -1621,110 +1779,176 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section
-          ref={gameAreaRef}
-          className="relative mt-4 h-[52vh] min-h-[300px] overflow-hidden rounded-2xl border border-indigo-300/35 bg-gradient-to-b from-blue-950/50 to-slate-950/95 md:h-[56vh] md:min-h-[340px]"
-        >
-          <div className="pointer-events-none absolute inset-0 z-[1]">
-            {likeBursts.map((item) => (
-              <span
-                key={item.id}
-                className="absolute select-none text-emerald-300 like-float"
-                style={{
-                  left: `${item.left}px`,
-                  top: `${item.top}px`,
-                  fontSize: `${item.size}px`,
-                }}
-              >
-                👍
-              </span>
-            ))}
-          </div>
-
-          {playMode === "plane_shooter" ? (
-            <>
-              {bullets.map((b) => (
-                <div
-                  key={b.id}
-                  className="pointer-events-none absolute z-[2] h-5 w-1 rounded-full bg-amber-300 shadow-[0_0_10px_rgba(252,211,77,0.9)]"
-                  style={{ left: `${b.x}px`, top: `${b.y}px` }}
-                />
-              ))}
-              <div
-                className="pointer-events-none absolute z-[2] text-3xl"
-                style={{ left: `${planeX - 16}px`, bottom: "10px" }}
-              >
-                <span className="inline-block origin-center -rotate-45">✈️</span>
-              </div>
-            </>
-          ) : null}
-
-          {words.map((word) => {
-            if (word.status === "hit" && !word.exploding) return null;
-
-            const isTarget = targetId === word.id && word.status === "live";
-            const baseClass =
-              word.status === "missed"
-                ? "border-rose-200/70 text-rose-100 opacity-55"
-                : "border-indigo-200/65 text-slate-100";
-
-            return (
-              <div
-                key={word.id}
-                className={[
-                  "absolute top-0 rounded-xl border bg-blue-950/90 px-3 py-1.5 text-lg font-bold tracking-wide shadow",
-                  baseClass,
-                  isTarget ? "border-emerald-300 shadow-emerald-400/30" : "",
-                  word.exploding ? "animate-boom" : "",
-                ].join(" ")}
-                style={{ left: `${word.x}px`, transform: `translateY(${word.y}px)` }}
-              >
-                {word.en}
-              </div>
-            );
-          })}
-
-          {gameState !== "running" ? (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/55 p-4 text-center">
-              <div className="max-w-xl rounded-2xl border border-indigo-200/35 bg-slate-950/95 p-6">
-                <h1 className="text-3xl font-extrabold">
-                  {gameState === "ended" ? "游戏结束" : "英语语音打词"}
-                </h1>
-                {gameState === "ended" ? (
-                  <>
-                    {playMode === "voice_match" ? (
-                      <>
-                        <p className="mt-2 text-indigo-100">正确 {correctCount} / {totalCount}</p>
-                        <p className="mt-1 text-indigo-100">准确率：{accuracy}%</p>
-                      </>
-                    ) : (
-                      <p className="mt-2 text-indigo-100">击中 {shooterHits} / {totalCount}</p>
-                    )}
-                    <p className="mt-1 text-indigo-100">最高连击：{bestStreak}</p>
-                    <p className="mt-1 text-3xl font-black text-emerald-300">
-                      {playMode === "voice_match" ? `评分：${score} / 10` : `成绩：${shooterHits}`}
-                    </p>
-                    <p className="mt-2 text-sm text-indigo-100/85">修改词库后可再次开始</p>
-                  </>
-                ) : (
-                  <>
-                    {playMode === "voice_match" ? (
-                      <>
-                        <p className="mt-2 text-indigo-100">看到中文后，在限时内按住空格说出对应英文。</p>
-                        <p className="mt-1 text-indigo-100">匹配成功时单词会爆炸消失，全部完成后自动评分。</p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="mt-2 text-indigo-100">按住空格说出下落中的英文，飞机会自动横向移动并射击。</p>
-                        <p className="mt-1 text-indigo-100">命中就爆炸消失，最终按击中数计分；下坠总高度可自定义。</p>
-                      </>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          ) : null}
+        <section className="mt-4 rounded-2xl border border-indigo-300/25 bg-slate-950/45 p-4">
+          <p className="text-sm font-semibold text-indigo-100">游戏会在弹窗窗口中运行</p>
+          <p className="mt-1 text-xs text-indigo-200/85">
+            点击上方“开始游戏”会弹出游戏窗口；游戏结束后可点击“关闭窗口”退出弹窗。
+          </p>
         </section>
+
+        {isGameModalOpen ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-3 md:p-6">
+            <div className="relative flex h-[88vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-indigo-200/35 bg-slate-950/95 shadow-2xl">
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-b border-indigo-300/30 bg-slate-950/95 px-4 py-3">
+                <div className="justify-self-start">
+                  <p className="text-sm font-semibold text-indigo-100">
+                    {playMode === "voice_match" ? "释义匹配模式" : "飞机射击模式"}
+                  </p>
+                  <p className="text-xs text-indigo-200/80">
+                    {gameState === "running" ? "游戏进行中（按住空格可语音识别）" : "可开始新一局或查看本局成绩"}
+                  </p>
+                </div>
+                {playMode === "voice_match" ? (
+                  <p className="max-w-[48vw] justify-self-center truncate text-center text-lg font-bold text-emerald-100">
+                    {currentMeaning || "准备开始..."}
+                  </p>
+                ) : (
+                  <div />
+                )}
+                <div className="flex items-center justify-self-end gap-2">
+                  {playMode === "voice_match" ? (
+                    <div className="rounded-lg border border-amber-300/35 bg-amber-500/10 px-3 py-1.5 text-right">
+                      <p className="text-[11px] text-amber-100/80">倒计时</p>
+                      <p className="text-sm font-bold text-amber-100">
+                        {gameState === "running" ? `${(countdownMs / 1000).toFixed(1)}s` : `${roundSeconds}s`}
+                      </p>
+                    </div>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={closeGameModal}
+                    className="rounded-lg border border-indigo-300/40 px-3 py-1.5 text-xs font-semibold text-indigo-100 transition hover:bg-indigo-400/20"
+                  >
+                    {gameState === "running" ? "结束并关闭" : "关闭窗口"}
+                  </button>
+                </div>
+              </div>
+
+              <section
+                ref={gameAreaRef}
+                className="relative flex-1 overflow-hidden bg-gradient-to-b from-blue-950/50 to-slate-950/95"
+              >
+                <div className="pointer-events-none absolute inset-0 z-[1]">
+                  {likeBursts.map((item) => (
+                    <span
+                      key={item.id}
+                      className="absolute select-none text-emerald-300 like-float"
+                      style={{
+                        left: `${item.left}px`,
+                        top: `${item.top}px`,
+                        fontSize: `${item.size}px`,
+                      }}
+                    >
+                      👍
+                    </span>
+                  ))}
+                </div>
+
+                {playMode === "plane_shooter" ? (
+                  <>
+                    {bullets.map((b) => (
+                      <div
+                        key={b.id}
+                        className="pointer-events-none absolute z-[2] h-5 w-1 rounded-full bg-amber-300 shadow-[0_0_10px_rgba(252,211,77,0.9)]"
+                        style={{ left: `${b.x}px`, top: `${b.y}px` }}
+                      />
+                    ))}
+                    <div
+                      className="pointer-events-none absolute z-[2] text-3xl"
+                      style={{ left: `${planeX - 16}px`, bottom: "10px" }}
+                    >
+                      <span className="inline-block origin-center -rotate-45">✈️</span>
+                    </div>
+                  </>
+                ) : null}
+
+                {words.map((word) => {
+                  if (word.status === "hit" && !word.exploding) return null;
+
+                  const isVoiceTarget =
+                    playMode === "voice_match" && targetId === word.id && word.status === "live";
+                  const isPlaneTarget =
+                    playMode === "plane_shooter" && planeTargetId === word.id && word.status === "live";
+                  const baseClass =
+                    word.status === "missed"
+                      ? "border-rose-200/70 text-rose-100 opacity-55"
+                      : "border-indigo-200/65 text-slate-100";
+
+                  return (
+                    <div
+                      key={word.id}
+                      className={[
+                        "absolute top-0 rounded-xl border px-3 py-1.5 text-lg font-bold tracking-wide shadow",
+                        isPlaneTarget ? "bg-rose-900/90" : "bg-blue-950/90",
+                        baseClass,
+                        isVoiceTarget ? "border-emerald-300 shadow-emerald-400/30" : "",
+                        isPlaneTarget ? "border-rose-300 shadow-rose-400/30" : "",
+                        word.exploding ? "animate-boom" : "",
+                      ].join(" ")}
+                      style={{ left: `${word.x}px`, transform: `translateY(${word.y}px)` }}
+                    >
+                      {playMode === "plane_shooter"
+                        ? (word.revealedEn ? word.en : word.zh)
+                        : word.en}
+                    </div>
+                  );
+                })}
+
+                {gameState !== "running" ? (
+                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/55 p-4 text-center">
+                    <div className="max-w-xl rounded-2xl border border-indigo-200/35 bg-slate-950/95 p-6">
+                      <h1 className="text-3xl font-extrabold">
+                        {gameState === "ended" ? "游戏结束" : "英语语音打词"}
+                      </h1>
+                      {gameState === "ended" ? (
+                        <>
+                          {playMode === "voice_match" ? (
+                            <>
+                              <p className="mt-2 text-indigo-100">正确 {correctCount} / {totalCount}</p>
+                              <p className="mt-1 text-indigo-100">准确率：{accuracy}%</p>
+                            </>
+                          ) : (
+                            <p className="mt-2 text-indigo-100">击中 {shooterHits} / {totalCount}</p>
+                          )}
+                          <p className="mt-1 text-indigo-100">最高连击：{bestStreak}</p>
+                          <p className="mt-1 text-3xl font-black text-emerald-300">
+                            {playMode === "voice_match" ? `评分：${score} / 10` : `成绩：${shooterHits}`}
+                          </p>
+                          <p className="mt-2 text-sm text-indigo-100/85">修改词库后可再次开始</p>
+                          <button
+                            type="button"
+                            onClick={closeGameModal}
+                            className="mt-3 rounded-lg border border-indigo-300/45 px-3 py-1.5 text-xs font-semibold text-indigo-100 transition hover:bg-indigo-400/20"
+                          >
+                            关闭窗口
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          {playMode === "voice_match" ? (
+                            <>
+                              <p className="mt-2 text-indigo-100">看到中文后，在限时内按住空格说出对应英文。</p>
+                              <p className="mt-1 text-indigo-100">匹配成功时单词会爆炸消失，全部完成后自动评分。</p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="mt-2 text-indigo-100">
+                                {planeDropChineseOnly
+                                  ? "中文会先下落，按住空格说出对应英文后，该词会切换为英文并变成红色目标。"
+                                  : "按住空格说出下落英文，匹配后该词会变成红色目标。"}
+                              </p>
+                              <p className="mt-1 text-indigo-100">左右方向键移动飞机，上方向键发射子弹，击中红色目标才会爆炸并计分。</p>
+                            </>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+              </section>
+            </div>
+          </div>
+        ) : null}
       </div>
     </main>
   );
