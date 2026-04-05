@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+@layer utilities {
+  .game-bg {
+    background:
+      radial-gradient(circle at 20% 20%, #253a72 0%, transparent 35%),
+      radial-gradient(circle at 75% 10%, #3c245f 0%, transparent 40%),
+      linear-gradient(160deg, #0b1021, #1b2a4a);
+  }
+
+  .like-float {
+    animation: like-float-up 0.85s ease-out forwards;
+    text-shadow: 0 0 10px rgba(52, 211, 153, 0.65);
+  }
+}
+
+@keyframes like-float-up {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.6);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-40px) scale(1.2);
+  }
+}
