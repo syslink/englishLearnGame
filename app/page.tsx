@@ -953,15 +953,19 @@ export default function HomePage() {
     setLlmProgress("正在初始化...");
     try {
       const { CreateMLCEngine, prebuiltAppConfig } = await import("@mlc-ai/web-llm");
-      // 使用 hf-mirror.com 镜像加速下载
+      // 通过本地 API 代理下载模型，避免 CORS 和网络问题
+      const origin = window.location.origin;
       const mirrorAppConfig = {
         ...prebuiltAppConfig,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         model_list: (prebuiltAppConfig.model_list as any[]).map((m) => ({
           ...m,
           model: typeof m.model === "string"
-            ? m.model.replace("https://huggingface.co", "https://hf-mirror.com")
+            ? m.model.replace("https://huggingface.co", `${origin}/api/hf-proxy`)
             : m.model,
+          model_lib: typeof m.model_lib === "string"
+            ? m.model_lib.replace("https://raw.githubusercontent.com", `${origin}/api/gh-proxy`)
+            : m.model_lib,
         })),
       };
       const engine = await CreateMLCEngine(llmModelId, {
