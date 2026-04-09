@@ -1,0 +1,1293 @@
+{
+  "version": "1.0",
+  "total_scenarios": 100,
+  "description": "100 situational English vocabulary lists with 8-12 practical words/phrases per scene, including Chinese meanings. Ideal for conversation, Anki, or programming.",
+  "scenarios": [
+    {
+      "id": 1,
+      "scene": "At the Airport (在机场)",
+      "words": [
+        {"word": "boarding pass", "meaning": "登机牌"},
+        {"word": "passport", "meaning": "护照"},
+        {"word": "security check", "meaning": "安检"},
+        {"word": "gate", "meaning": "登机口"},
+        {"word": "baggage claim", "meaning": "行李提取处"},
+        {"word": "check-in", "meaning": "办理登机手续"},
+        {"word": "departure", "meaning": "出发"},
+        {"word": "arrival", "meaning": "到达"},
+        {"word": "customs", "meaning": "海关"},
+        {"word": "flight attendant", "meaning": "空乘人员"}
+      ]
+    },
+    {
+      "id": 2,
+      "scene": "Hotel Check-in (酒店入住)",
+      "words": [
+        {"word": "reception", "meaning": "前台"},
+        {"word": "reservation", "meaning": "预订"},
+        {"word": "single/double room", "meaning": "单人间/双人间"},
+        {"word": "check-in", "meaning": "入住登记"},
+        {"word": "key card", "meaning": "房卡"},
+        {"word": "Wi-Fi password", "meaning": "无线网络密码"},
+        {"word": "luggage", "meaning": "行李"},
+        {"word": "room service", "meaning": "客房服务"},
+        {"word": "checkout", "meaning": "退房"}
+      ]
+    },
+    {
+      "id": 3,
+      "scene": "Ordering Food at a Restaurant (餐厅点餐)",
+      "words": [
+        {"word": "menu", "meaning": "菜单"},
+        {"word": "appetizer", "meaning": "开胃菜"},
+        {"word": "main course", "meaning": "主菜"},
+        {"word": "dessert", "meaning": "甜点"},
+        {"word": "bill/check", "meaning": "账单"},
+        {"word": "waiter/waitress", "meaning": "服务员"},
+        {"word": "rare/medium/well-done", "meaning": "三分熟/五分熟/全熟"},
+        {"word": "takeout", "meaning": "外带"},
+        {"word": "tip", "meaning": "小费"}
+      ]
+    },
+    {
+      "id": 4,
+      "scene": "Supermarket Shopping (超市购物)",
+      "words": [
+        {"word": "shopping cart", "meaning": "购物车"},
+        {"word": "checkout counter", "meaning": "收银台"},
+        {"word": "aisle", "meaning": "货架通道"},
+        {"word": "fresh produce", "meaning": "新鲜蔬果区"},
+        {"word": "dairy", "meaning": "乳制品"},
+        {"word": "barcode", "meaning": "条形码"},
+        {"word": "receipt", "meaning": "收据"},
+        {"word": "sale/discount", "meaning": "特价/折扣"},
+        {"word": "self-checkout", "meaning": "自助结账"}
+      ]
+    },
+    {
+      "id": 5,
+      "scene": "At the Bank (在银行)",
+      "words": [
+        {"word": "teller", "meaning": "柜员"},
+        {"word": "deposit", "meaning": "存款"},
+        {"word": "withdrawal", "meaning": "取款"},
+        {"word": "account balance", "meaning": "账户余额"},
+        {"word": "ATM", "meaning": "自动取款机"},
+        {"word": "transfer", "meaning": "转账"},
+        {"word": "PIN code", "meaning": "密码"},
+        {"word": "check", "meaning": "支票"},
+        {"word": "loan", "meaning": "贷款"}
+      ]
+    },
+    {
+      "id": 6,
+      "scene": "Visiting a Doctor (看医生)",
+      "words": [
+        {"word": "symptom", "meaning": "症状"},
+        {"word": "prescription", "meaning": "处方"},
+        {"word": "check-up", "meaning": "体检"},
+        {"word": "fever", "meaning": "发烧"},
+        {"word": "painkiller", "meaning": "止痛药"},
+        {"word": "appointment", "meaning": "预约"},
+        {"word": "blood test", "meaning": "验血"},
+        {"word": "sick leave", "meaning": "病假"}
+      ]
+    },
+    {
+      "id": 7,
+      "scene": "In the Classroom (课堂上)",
+      "words": [
+        {"word": "homework", "meaning": "家庭作业"},
+        {"word": "quiz/test", "meaning": "小测验/考试"},
+        {"word": "blackboard/whiteboard", "meaning": "黑板/白板"},
+        {"word": "raise your hand", "meaning": "举手"},
+        {"word": "presentation", "meaning": "课堂展示"},
+        {"word": "note-taking", "meaning": "记笔记"},
+        {"word": "attendance", "meaning": "出勤"},
+        {"word": "group discussion", "meaning": "小组讨论"}
+      ]
+    },
+    {
+      "id": 8,
+      "scene": "Job Interview (求职面试)",
+      "words": [
+        {"word": "resume/CV", "meaning": "简历"},
+        {"word": "experience", "meaning": "工作经验"},
+        {"word": "qualification", "meaning": "资格"},
+        {"word": "salary", "meaning": "薪资"},
+        {"word": "strength", "meaning": "优势"},
+        {"word": "weakness", "meaning": "弱点"},
+        {"word": "teamwork", "meaning": "团队合作"},
+        {"word": "offer letter", "meaning": "录用通知"}
+      ]
+    },
+    {
+      "id": 9,
+      "scene": "Making a Phone Call (打电话)",
+      "words": [
+        {"word": "dial", "meaning": "拨号"},
+        {"word": "hold on", "meaning": "稍等"},
+        {"word": "voicemail", "meaning": "语音信箱"},
+        {"word": "busy signal", "meaning": "忙音"},
+        {"word": "hang up", "meaning": "挂断"},
+        {"word": "call back", "meaning": "回电"},
+        {"word": "extension", "meaning": "分机"}
+      ]
+    },
+    {
+      "id": 10,
+      "scene": "At a Party (参加派对)",
+      "words": [
+        {"word": "introduce yourself", "meaning": "自我介绍"},
+        {"word": "guest", "meaning": "客人"},
+        {"word": "host", "meaning": "主人"},
+        {"word": "snack", "meaning": "小吃"},
+        {"word": "dance floor", "meaning": "舞池"},
+        {"word": "cheers", "meaning": "干杯"},
+        {"word": "small talk", "meaning": "闲聊"}
+      ]
+    },
+    {
+      "id": 11,
+      "scene": "Taking a Taxi (打出租车)",
+      "words": [
+        {"word": "meter", "meaning": "计价器"},
+        {"word": "fare", "meaning": "车费"},
+        {"word": "drop me off", "meaning": "让我下车"},
+        {"word": "destination", "meaning": "目的地"},
+        {"word": "traffic jam", "meaning": "交通堵塞"},
+        {"word": "tip", "meaning": "小费"}
+      ]
+    },
+    {
+      "id": 12,
+      "scene": "At the Train Station (火车站)",
+      "words": [
+        {"word": "platform", "meaning": "站台"},
+        {"word": "ticket machine", "meaning": "售票机"},
+        {"word": "one-way/return ticket", "meaning": "单程/往返票"},
+        {"word": "schedule/timetable", "meaning": "时刻表"},
+        {"word": "delay", "meaning": "延误"}
+      ]
+    },
+    {
+      "id": 13,
+      "scene": "In the Kitchen (厨房里)",
+      "words": [
+        {"word": "fridge", "meaning": "冰箱"},
+        {"word": "oven", "meaning": "烤箱"},
+        {"word": "sink", "meaning": "水槽"},
+        {"word": "cut", "meaning": "切"},
+        {"word": "boil", "meaning": "煮沸"},
+        {"word": "fry", "meaning": "煎炒"}
+      ]
+    },
+    {
+      "id": 14,
+      "scene": "Clothes Shopping (买衣服)",
+      "words": [
+        {"word": "try on", "meaning": "试穿"},
+        {"word": "size", "meaning": "尺码"},
+        {"word": "fitting room", "meaning": "试衣间"},
+        {"word": "discount", "meaning": "折扣"},
+        {"word": "cashier", "meaning": "收银员"}
+      ]
+    },
+    {
+      "id": 15,
+      "scene": "At the Post Office (邮局)",
+      "words": [
+        {"word": "stamp", "meaning": "邮票"},
+        {"word": "parcel/package", "meaning": "包裹"},
+        {"word": "mail", "meaning": "邮件"},
+        {"word": "send by airmail", "meaning": "航空邮寄"}
+      ]
+    },
+    {
+      "id": 16,
+      "scene": "Weather Talk (谈论天气)",
+      "words": [
+        {"word": "sunny", "meaning": "晴天"},
+        {"word": "rainy", "meaning": "下雨"},
+        {"word": "cloudy", "meaning": "多云"},
+        {"word": "windy", "meaning": "有风"},
+        {"word": "temperature", "meaning": "温度"}
+      ]
+    },
+    {
+      "id": 17,
+      "scene": "Daily Routine (日常作息)",
+      "words": [
+        {"word": "wake up", "meaning": "醒来"},
+        {"word": "brush teeth", "meaning": "刷牙"},
+        {"word": "have breakfast", "meaning": "吃早餐"},
+        {"word": "go to work", "meaning": "去上班"},
+        {"word": "go to bed", "meaning": "睡觉"}
+      ]
+    },
+    {
+      "id": 18,
+      "scene": "Describing People (描述人)",
+      "words": [
+        {"word": "tall/short", "meaning": "高/矮"},
+        {"word": "friendly", "meaning": "友好的"},
+        {"word": "smart", "meaning": "聪明的"},
+        {"word": "kind", "meaning": "善良的"}
+      ]
+    },
+    {
+      "id": 19,
+      "scene": "Family Members (家庭成员)",
+      "words": [
+        {"word": "parent", "meaning": "父母"},
+        {"word": "sibling", "meaning": "兄弟姐妹"},
+        {"word": "grandparent", "meaning": "祖父母"},
+        {"word": "cousin", "meaning": "表/堂兄弟姐妹"}
+      ]
+    },
+    {
+      "id": 20,
+      "scene": "Directions (问路)",
+      "words": [
+        {"word": "turn left/right", "meaning": "左转/右转"},
+        {"word": "go straight", "meaning": "直走"},
+        {"word": "opposite", "meaning": "对面"},
+        {"word": "next to", "meaning": "旁边"}
+      ]
+    },
+    {
+      "id": 21,
+      "scene": "At the Pharmacy (药店)",
+      "words": [
+        {"word": "medicine", "meaning": "药"},
+        {"word": "headache", "meaning": "头痛"},
+        {"word": "cold", "meaning": "感冒"},
+        {"word": "ointment", "meaning": "药膏"}
+      ]
+    },
+    {
+      "id": 22,
+      "scene": "Sports (运动)",
+      "words": [
+        {"word": "soccer/football", "meaning": "足球"},
+        {"word": "basketball", "meaning": "篮球"},
+        {"word": "swimming", "meaning": "游泳"},
+        {"word": "gym", "meaning": "健身房"}
+      ]
+    },
+    {
+      "id": 23,
+      "scene": "At the Cinema (电影院)",
+      "words": [
+        {"word": "ticket", "meaning": "电影票"},
+        {"word": "popcorn", "meaning": "爆米花"},
+        {"word": "trailer", "meaning": "预告片"},
+        {"word": "screen", "meaning": "银幕"}
+      ]
+    },
+    {
+      "id": 24,
+      "scene": "Email and Internet (电子邮件与网络)",
+      "words": [
+        {"word": "send", "meaning": "发送"},
+        {"word": "attach", "meaning": "附件"},
+        {"word": "password", "meaning": "密码"},
+        {"word": "download", "meaning": "下载"}
+      ]
+    },
+    {
+      "id": 25,
+      "scene": "Greetings and Introductions (问候与介绍)",
+      "words": [
+        {"word": "Nice to meet you", "meaning": "很高兴认识你"},
+        {"word": "How are you?", "meaning": "你好吗？"},
+        {"word": "My name is...", "meaning": "我叫..."}
+      ]
+    },
+    {
+      "id": 26,
+      "scene": "In the Living Room (客厅里)",
+      "words": [
+        {"word": "sofa", "meaning": "沙发"},
+        {"word": "remote control", "meaning": "遥控器"},
+        {"word": "coffee table", "meaning": "茶几"},
+        {"word": "bookshelf", "meaning": "书架"},
+        {"word": "lamp", "meaning": "台灯"},
+        {"word": "curtain", "meaning": "窗帘"},
+        {"word": "watch TV", "meaning": "看电视"},
+        {"word": "relax", "meaning": "放松"}
+      ]
+    },
+    {
+      "id": 27,
+      "scene": "In the Bedroom (卧室里)",
+      "words": [
+        {"word": "bed", "meaning": "床"},
+        {"word": "pillow", "meaning": "枕头"},
+        {"word": "blanket", "meaning": "毯子"},
+        {"word": "wardrobe", "meaning": "衣柜"},
+        {"word": "alarm clock", "meaning": "闹钟"},
+        {"word": "mirror", "meaning": "镜子"},
+        {"word": "go to bed", "meaning": "上床睡觉"},
+        {"word": "wake up", "meaning": "醒来"}
+      ]
+    },
+    {
+      "id": 28,
+      "scene": "In the Bathroom (浴室里)",
+      "words": [
+        {"word": "shower", "meaning": "淋浴"},
+        {"word": "bathtub", "meaning": "浴缸"},
+        {"word": "sink", "meaning": "洗手池"},
+        {"word": "toothbrush", "meaning": "牙刷"},
+        {"word": "toothpaste", "meaning": "牙膏"},
+        {"word": "towel", "meaning": "毛巾"},
+        {"word": "shampoo", "meaning": "洗发水"},
+        {"word": "soap", "meaning": "肥皂"}
+      ]
+    },
+    {
+      "id": 29,
+      "scene": "Cooking in the Kitchen (厨房做饭)",
+      "words": [
+        {"word": "fridge", "meaning": "冰箱"},
+        {"word": "oven", "meaning": "烤箱"},
+        {"word": "stove", "meaning": "炉灶"},
+        {"word": "pot", "meaning": "锅"},
+        {"word": "pan", "meaning": "平底锅"},
+        {"word": "boil", "meaning": "煮沸"},
+        {"word": "fry", "meaning": "煎炒"},
+        {"word": "chop", "meaning": "切"},
+        {"word": "recipe", "meaning": "食谱"}
+      ]
+    },
+    {
+      "id": 30,
+      "scene": "At the Grocery Store (杂货店购物)",
+      "words": [
+        {"word": "bread", "meaning": "面包"},
+        {"word": "milk", "meaning": "牛奶"},
+        {"word": "eggs", "meaning": "鸡蛋"},
+        {"word": "fruit", "meaning": "水果"},
+        {"word": "vegetables", "meaning": "蔬菜"},
+        {"word": "canned food", "meaning": "罐头食品"},
+        {"word": "basket", "meaning": "购物篮"},
+        {"word": "cashier", "meaning": "收银员"}
+      ]
+    },
+    {
+      "id": 31,
+      "scene": "Describing Clothes (描述衣服)",
+      "words": [
+        {"word": "shirt", "meaning": "衬衫"},
+        {"word": "trousers/pants", "meaning": "裤子"},
+        {"word": "dress", "meaning": "连衣裙"},
+        {"word": "jacket", "meaning": "夹克"},
+        {"word": "shoes", "meaning": "鞋子"},
+        {"word": "size", "meaning": "尺码"},
+        {"word": "try on", "meaning": "试穿"},
+        {"word": "fashion", "meaning": "时尚"}
+      ]
+    },
+    {
+      "id": 32,
+      "scene": "Talking about Health (谈论健康)",
+      "words": [
+        {"word": "headache", "meaning": "头痛"},
+        {"word": "cold", "meaning": "感冒"},
+        {"word": "fever", "meaning": "发烧"},
+        {"word": "cough", "meaning": "咳嗽"},
+        {"word": "exercise", "meaning": "运动"},
+        {"word": "healthy", "meaning": "健康的"},
+        {"word": "medicine", "meaning": "药"},
+        {"word": "recover", "meaning": "恢复"}
+      ]
+    },
+    {
+      "id": 33,
+      "scene": "At the Gym / Sports (健身房/运动)",
+      "words": [
+        {"word": "gym", "meaning": "健身房"},
+        {"word": "workout", "meaning": "锻炼"},
+        {"word": "run", "meaning": "跑步"},
+        {"word": "swim", "meaning": "游泳"},
+        {"word": "football/soccer", "meaning": "足球"},
+        {"word": "basketball", "meaning": "篮球"},
+        {"word": "fitness", "meaning": "健身"},
+        {"word": "trainer", "meaning": "教练"}
+      ]
+    },
+    {
+      "id": 34,
+      "scene": "Watching TV / Movies (看电视/电影)",
+      "words": [
+        {"word": "channel", "meaning": "频道"},
+        {"word": "remote", "meaning": "遥控器"},
+        {"word": "series", "meaning": "电视剧"},
+        {"word": "film/movie", "meaning": "电影"},
+        {"word": "actor", "meaning": "演员"},
+        {"word": "director", "meaning": "导演"},
+        {"word": "comedy", "meaning": "喜剧"},
+        {"word": "thriller", "meaning": "惊悚片"}
+      ]
+    },
+    {
+      "id": 35,
+      "scene": "Music and Listening (音乐与听歌)",
+      "words": [
+        {"word": "song", "meaning": "歌曲"},
+        {"word": "album", "meaning": "专辑"},
+        {"word": "playlist", "meaning": "播放列表"},
+        {"word": "guitar", "meaning": "吉他"},
+        {"word": "headphones", "meaning": "耳机"},
+        {"word": "listen to", "meaning": "听"},
+        {"word": "concert", "meaning": "演唱会"}
+      ]
+    },
+    {
+      "id": 36,
+      "scene": "Weather and Seasons (天气与季节)",
+      "words": [
+        {"word": "sunny", "meaning": "晴朗的"},
+        {"word": "rainy", "meaning": "下雨的"},
+        {"word": "cloudy", "meaning": "多云的"},
+        {"word": "windy", "meaning": "有风的"},
+        {"word": "hot/cold", "meaning": "热的/冷的"},
+        {"word": "temperature", "meaning": "温度"},
+        {"word": "season", "meaning": "季节"},
+        {"word": "forecast", "meaning": "天气预报"}
+      ]
+    },
+    {
+      "id": 37,
+      "scene": "In the Office / Work (办公室/工作)",
+      "words": [
+        {"word": "meeting", "meaning": "会议"},
+        {"word": "colleague", "meaning": "同事"},
+        {"word": "boss", "meaning": "老板"},
+        {"word": "deadline", "meaning": "截止日期"},
+        {"word": "report", "meaning": "报告"},
+        {"word": "computer", "meaning": "电脑"},
+        {"word": "email", "meaning": "电子邮件"},
+        {"word": "presentation", "meaning": "演示文稿"}
+      ]
+    },
+    {
+      "id": 38,
+      "scene": "Studying and Exams (学习与考试)",
+      "words": [
+        {"word": "notebook", "meaning": "笔记本"},
+        {"word": "pen/pencil", "meaning": "钢笔/铅笔"},
+        {"word": "exam/test", "meaning": "考试"},
+        {"word": "pass/fail", "meaning": "通过/不及格"},
+        {"word": "homework", "meaning": "家庭作业"},
+        {"word": "study", "meaning": "学习"},
+        {"word": "review", "meaning": "复习"}
+      ]
+    },
+    {
+      "id": 39,
+      "scene": "Family and Relatives (家庭与亲戚)",
+      "words": [
+        {"word": "mother/mom", "meaning": "母亲/妈妈"},
+        {"word": "father/dad", "meaning": "父亲/爸爸"},
+        {"word": "brother", "meaning": "兄弟"},
+        {"word": "sister", "meaning": "姐妹"},
+        {"word": "grandparent", "meaning": "祖父母"},
+        {"word": "cousin", "meaning": "表/堂兄弟姐妹"},
+        {"word": "relative", "meaning": "亲戚"}
+      ]
+    },
+    {
+      "id": 40,
+      "scene": "Describing People (描述人)",
+      "words": [
+        {"word": "tall/short", "meaning": "高的/矮的"},
+        {"word": "young/old", "meaning": "年轻的/年老的"},
+        {"word": "friendly", "meaning": "友好的"},
+        {"word": "kind", "meaning": "善良的"},
+        {"word": "smart", "meaning": "聪明的"},
+        {"word": "appearance", "meaning": "外貌"},
+        {"word": "personality", "meaning": "个性"}
+      ]
+    },
+    {
+      "id": 41,
+      "scene": "Feelings and Emotions (感受与情绪)",
+      "words": [
+        {"word": "happy", "meaning": "高兴的"},
+        {"word": "sad", "meaning": "伤心的"},
+        {"word": "angry", "meaning": "生气的"},
+        {"word": "tired", "meaning": "疲倦的"},
+        {"word": "excited", "meaning": "兴奋的"},
+        {"word": "worried", "meaning": "担心的"},
+        {"word": "feel", "meaning": "感觉"}
+      ]
+    },
+    {
+      "id": 42,
+      "scene": "Holidays and Festivals (假期与节日)",
+      "words": [
+        {"word": "Christmas", "meaning": "圣诞节"},
+        {"word": "New Year", "meaning": "新年"},
+        {"word": "birthday", "meaning": "生日"},
+        {"word": "vacation", "meaning": "假期"},
+        {"word": "celebrate", "meaning": "庆祝"},
+        {"word": "gift/present", "meaning": "礼物"},
+        {"word": "party", "meaning": "派对"}
+      ]
+    },
+    {
+      "id": 43,
+      "scene": "Travel by Car / Driving (开车旅行)",
+      "words": [
+        {"word": "drive", "meaning": "开车"},
+        {"word": "road", "meaning": "道路"},
+        {"word": "traffic light", "meaning": "交通灯"},
+        {"word": "gas station", "meaning": "加油站"},
+        {"word": "map", "meaning": "地图"},
+        {"word": "parking", "meaning": "停车"},
+        {"word": "speed limit", "meaning": "限速"}
+      ]
+    },
+    {
+      "id": 44,
+      "scene": "At the Beach / Sea (在海滩/海边)",
+      "words": [
+        {"word": "beach", "meaning": "海滩"},
+        {"word": "sand", "meaning": "沙子"},
+        {"word": "swim", "meaning": "游泳"},
+        {"word": "sunbathe", "meaning": "晒太阳"},
+        {"word": "wave", "meaning": "海浪"},
+        {"word": "seashell", "meaning": "贝壳"},
+        {"word": "sunscreen", "meaning": "防晒霜"}
+      ]
+    },
+    {
+      "id": 45,
+      "scene": "Sightseeing (观光旅游)",
+      "words": [
+        {"word": "tourist", "meaning": "游客"},
+        {"word": "guide", "meaning": "导游"},
+        {"word": "landmark", "meaning": "地标"},
+        {"word": "museum", "meaning": "博物馆"},
+        {"word": "photo", "meaning": "照片"},
+        {"word": "souvenir", "meaning": "纪念品"},
+        {"word": "visit", "meaning": "参观"}
+      ]
+    },
+    {
+      "id": 46,
+      "scene": "Renting a House / Apartment (租房)",
+      "words": [
+        {"word": "rent", "meaning": "租金"},
+        {"word": "landlord", "meaning": "房东"},
+        {"word": "apartment", "meaning": "公寓"},
+        {"word": "furniture", "meaning": "家具"},
+        {"word": "contract", "meaning": "合同"},
+        {"word": "deposit", "meaning": "押金"},
+        {"word": "move in", "meaning": "入住"}
+      ]
+    },
+    {
+      "id": 47,
+      "scene": "Emergencies (紧急情况)",
+      "words": [
+        {"word": "help", "meaning": "帮助"},
+        {"word": "ambulance", "meaning": "救护车"},
+        {"word": "police", "meaning": "警察"},
+        {"word": "fire", "meaning": "火灾"},
+        {"word": "accident", "meaning": "事故"},
+        {"word": "hospital", "meaning": "医院"},
+        {"word": "emergency", "meaning": "紧急"}
+      ]
+    },
+    {
+      "id": 48,
+      "scene": "Online Shopping (网购)",
+      "words": [
+        {"word": "website", "meaning": "网站"},
+        {"word": "cart/basket", "meaning": "购物车"},
+        {"word": "checkout", "meaning": "结账"},
+        {"word": "delivery", "meaning": "配送"},
+        {"word": "review", "meaning": "评价"},
+        {"word": "order", "meaning": "订单"},
+        {"word": "payment", "meaning": "支付"}
+      ]
+    },
+    {
+      "id": 49,
+      "scene": "Talking on the Phone (电话交谈)",
+      "words": [
+        {"word": "call", "meaning": "打电话"},
+        {"word": "answer", "meaning": "接电话"},
+        {"word": "message", "meaning": "留言"},
+        {"word": "signal", "meaning": "信号"},
+        {"word": "battery", "meaning": "电池"},
+        {"word": "hang up", "meaning": "挂断"}
+      ]
+    },
+    {
+      "id": 50,
+      "scene": "Small Talk / Daily Conversation (闲聊/日常对话)",
+      "words": [
+        {"word": "How are you?", "meaning": "你好吗？"},
+        {"word": "Nice weather", "meaning": "天气不错"},
+        {"word": "What do you do?", "meaning": "你做什么工作？"},
+        {"word": "See you later", "meaning": "回头见"},
+        {"word": "Thank you", "meaning": "谢谢"},
+        {"word": "You're welcome", "meaning": "不客气"}
+      ]
+    },
+    {
+      "id": 51,
+      "scene": "House and Home (房屋与家居)",
+      "words": [
+        {"word": "furniture", "meaning": "家具"},
+        {"word": "living room", "meaning": "客厅"},
+        {"word": "bedroom", "meaning": "卧室"},
+        {"word": "kitchen", "meaning": "厨房"},
+        {"word": "bathroom", "meaning": "浴室"},
+        {"word": "garden", "meaning": "花园"},
+        {"word": "balcony", "meaning": "阳台"},
+        {"word": "rent", "meaning": "租金"}
+      ]
+    },
+    {
+      "id": 52,
+      "scene": "Food and Drink (食物与饮料)",
+      "words": [
+        {"word": "breakfast", "meaning": "早餐"},
+        {"word": "lunch", "meaning": "午餐"},
+        {"word": "dinner", "meaning": "晚餐"},
+        {"word": "menu", "meaning": "菜单"},
+        {"word": "delicious", "meaning": "美味的"},
+        {"word": "thirsty", "meaning": "口渴的"},
+        {"word": "hungry", "meaning": "饥饿的"},
+        {"word": "vegetarian", "meaning": "素食者"}
+      ]
+    },
+    {
+      "id": 53,
+      "scene": "Shopping and Stores (购物与商店)",
+      "words": [
+        {"word": "department store", "meaning": "百货商店"},
+        {"word": "supermarket", "meaning": "超市"},
+        {"word": "sale", "meaning": "特价"},
+        {"word": "credit card", "meaning": "信用卡"},
+        {"word": "cash", "meaning": "现金"},
+        {"word": "try on", "meaning": "试穿"},
+        {"word": "receipt", "meaning": "收据"},
+        {"word": "customer", "meaning": "顾客"}
+      ]
+    },
+    {
+      "id": 54,
+      "scene": "Sports and Exercise (运动与锻炼)",
+      "words": [
+        {"word": "football", "meaning": "足球"},
+        {"word": "swimming", "meaning": "游泳"},
+        {"word": "gym", "meaning": "健身房"},
+        {"word": "jogging", "meaning": "慢跑"},
+        {"word": "team", "meaning": "团队"},
+        {"word": "win", "meaning": "赢"},
+        {"word": "lose", "meaning": "输"},
+        {"word": "score", "meaning": "比分"}
+      ]
+    },
+    {
+      "id": 55,
+      "scene": "Travel and Holidays (旅行与假期)",
+      "words": [
+        {"word": "vacation", "meaning": "假期"},
+        {"word": "ticket", "meaning": "票"},
+        {"word": "suitcase", "meaning": "行李箱"},
+        {"word": "passport", "meaning": "护照"},
+        {"word": "hotel", "meaning": "酒店"},
+        {"word": "beach", "meaning": "海滩"},
+        {"word": "sightseeing", "meaning": "观光"},
+        {"word": "souvenir", "meaning": "纪念品"}
+      ]
+    },
+    {
+      "id": 56,
+      "scene": "Entertainment and Media (娱乐与媒体)",
+      "words": [
+        {"word": "movie", "meaning": "电影"},
+        {"word": "cinema", "meaning": "电影院"},
+        {"word": "music", "meaning": "音乐"},
+        {"word": "concert", "meaning": "演唱会"},
+        {"word": "television", "meaning": "电视"},
+        {"word": "news", "meaning": "新闻"},
+        {"word": "actor", "meaning": "演员"},
+        {"word": "song", "meaning": "歌曲"}
+      ]
+    },
+    {
+      "id": 57,
+      "scene": "Health and Illness (健康与疾病)",
+      "words": [
+        {"word": "doctor", "meaning": "医生"},
+        {"word": "hospital", "meaning": "医院"},
+        {"word": "headache", "meaning": "头痛"},
+        {"word": "medicine", "meaning": "药"},
+        {"word": "prescription", "meaning": "处方"},
+        {"word": "pain", "meaning": "疼痛"},
+        {"word": "exercise", "meaning": "运动"},
+        {"word": "healthy", "meaning": "健康的"}
+      ]
+    },
+    {
+      "id": 58,
+      "scene": "Education and School (教育与学校)",
+      "words": [
+        {"word": "student", "meaning": "学生"},
+        {"word": "teacher", "meaning": "老师"},
+        {"word": "classroom", "meaning": "教室"},
+        {"word": "homework", "meaning": "家庭作业"},
+        {"word": "exam", "meaning": "考试"},
+        {"word": "subject", "meaning": "科目"},
+        {"word": "library", "meaning": "图书馆"},
+        {"word": "learn", "meaning": "学习"}
+      ]
+    },
+    {
+      "id": 59,
+      "scene": "Work and Jobs (工作与职业)",
+      "words": [
+        {"word": "office", "meaning": "办公室"},
+        {"word": "colleague", "meaning": "同事"},
+        {"word": "meeting", "meaning": "会议"},
+        {"word": "boss", "meaning": "老板"},
+        {"word": "salary", "meaning": "薪水"},
+        {"word": "job", "meaning": "工作"},
+        {"word": "interview", "meaning": "面试"},
+        {"word": "promotion", "meaning": "升职"}
+      ]
+    },
+    {
+      "id": 60,
+      "scene": "Feelings and Emotions (感受与情绪)",
+      "words": [
+        {"word": "happy", "meaning": "高兴的"},
+        {"word": "sad", "meaning": "伤心的"},
+        {"word": "angry", "meaning": "生气的"},
+        {"word": "excited", "meaning": "兴奋的"},
+        {"word": "tired", "meaning": "疲倦的"},
+        {"word": "worried", "meaning": "担心的"},
+        {"word": "surprised", "meaning": "惊讶的"},
+        {"word": "bored", "meaning": "无聊的"}
+      ]
+    },
+    {
+      "id": 61,
+      "scene": "Weather and Seasons (天气与季节)",
+      "words": [
+        {"word": "sunny", "meaning": "晴朗的"},
+        {"word": "rainy", "meaning": "下雨的"},
+        {"word": "cloudy", "meaning": "多云的"},
+        {"word": "windy", "meaning": "有风的"},
+        {"word": "snowy", "meaning": "下雪的"},
+        {"word": "hot", "meaning": "热的"},
+        {"word": "cold", "meaning": "冷的"},
+        {"word": "forecast", "meaning": "天气预报"}
+      ]
+    },
+    {
+      "id": 62,
+      "scene": "Clothes and Fashion (衣服与时尚)",
+      "words": [
+        {"word": "shirt", "meaning": "衬衫"},
+        {"word": "trousers", "meaning": "裤子"},
+        {"word": "dress", "meaning": "连衣裙"},
+        {"word": "jacket", "meaning": "夹克"},
+        {"word": "shoes", "meaning": "鞋子"},
+        {"word": "size", "meaning": "尺码"},
+        {"word": "fashion", "meaning": "时尚"},
+        {"word": "wear", "meaning": "穿"}
+      ]
+    },
+    {
+      "id": 63,
+      "scene": "Family and Relationships (家庭与关系)",
+      "words": [
+        {"word": "mother", "meaning": "母亲"},
+        {"word": "father", "meaning": "父亲"},
+        {"word": "brother", "meaning": "兄弟"},
+        {"word": "sister", "meaning": "姐妹"},
+        {"word": "grandparent", "meaning": "祖父母"},
+        {"word": "cousin", "meaning": "表/堂兄弟姐妹"},
+        {"word": "friend", "meaning": "朋友"},
+        {"word": "relative", "meaning": "亲戚"}
+      ]
+    },
+    {
+      "id": 64,
+      "scene": "Directions and Places (方向与地点)",
+      "words": [
+        {"word": "left", "meaning": "左边"},
+        {"word": "right", "meaning": "右边"},
+        {"word": "straight", "meaning": "直走"},
+        {"word": "opposite", "meaning": "对面"},
+        {"word": "next to", "meaning": "旁边"},
+        {"word": "near", "meaning": "附近"},
+        {"word": "far", "meaning": "远的"},
+        {"word": "map", "meaning": "地图"}
+      ]
+    },
+    {
+      "id": 65,
+      "scene": "Hobbies and Free Time (爱好与休闲)",
+      "words": [
+        {"word": "hobby", "meaning": "爱好"},
+        {"word": "reading", "meaning": "阅读"},
+        {"word": "painting", "meaning": "绘画"},
+        {"word": "dancing", "meaning": "跳舞"},
+        {"word": "playing music", "meaning": "演奏音乐"},
+        {"word": "gardening", "meaning": "园艺"},
+        {"word": "collecting", "meaning": "收藏"},
+        {"word": "relax", "meaning": "放松"}
+      ]
+    },
+    {
+      "id": 66,
+      "scene": "At the Cafe (在咖啡馆)",
+      "words": [
+        {"word": "coffee", "meaning": "咖啡"},
+        {"word": "tea", "meaning": "茶"},
+        {"word": "cake", "meaning": "蛋糕"},
+        {"word": "waiter", "meaning": "服务员"},
+        {"word": "order", "meaning": "点单"},
+        {"word": "bill", "meaning": "账单"},
+        {"word": "takeaway", "meaning": "外带"}
+      ]
+    },
+    {
+      "id": 67,
+      "scene": "Public Transport (公共交通)",
+      "words": [
+        {"word": "bus", "meaning": "公交车"},
+        {"word": "train", "meaning": "火车"},
+        {"word": "subway", "meaning": "地铁"},
+        {"word": "ticket", "meaning": "车票"},
+        {"word": "station", "meaning": "车站"},
+        {"word": "platform", "meaning": "站台"},
+        {"word": "delay", "meaning": "延误"}
+      ]
+    },
+    {
+      "id": 68,
+      "scene": "Describing Objects (描述物品)",
+      "words": [
+        {"word": "big/small", "meaning": "大的/小的"},
+        {"word": "heavy/light", "meaning": "重的/轻的"},
+        {"word": "expensive/cheap", "meaning": "贵的/便宜的"},
+        {"word": "new/old", "meaning": "新的/旧的"},
+        {"word": "color", "meaning": "颜色"}
+      ]
+    },
+    {
+      "id": 69,
+      "scene": "Time and Daily Routine (时间与日常作息)",
+      "words": [
+        {"word": "morning", "meaning": "早晨"},
+        {"word": "afternoon", "meaning": "下午"},
+        {"word": "evening", "meaning": "晚上"},
+        {"word": "wake up", "meaning": "醒来"},
+        {"word": "go to bed", "meaning": "上床睡觉"},
+        {"word": "breakfast", "meaning": "早餐"},
+        {"word": "schedule", "meaning": "时间表"}
+      ]
+    },
+    {
+      "id": 70,
+      "scene": "Animals and Pets (动物与宠物)",
+      "words": [
+        {"word": "dog", "meaning": "狗"},
+        {"word": "cat", "meaning": "猫"},
+        {"word": "bird", "meaning": "鸟"},
+        {"word": "fish", "meaning": "鱼"},
+        {"word": "pet", "meaning": "宠物"},
+        {"word": "farm", "meaning": "农场"},
+        {"word": "wild", "meaning": "野生的"}
+      ]
+    },
+    {
+      "id": 71,
+      "scene": "Environment and Nature (环境与自然)",
+      "words": [
+        {"word": "tree", "meaning": "树"},
+        {"word": "river", "meaning": "河流"},
+        {"word": "mountain", "meaning": "山"},
+        {"word": "pollution", "meaning": "污染"},
+        {"word": "recycle", "meaning": "回收"},
+        {"word": "nature", "meaning": "自然"},
+        {"word": "protect", "meaning": "保护"}
+      ]
+    },
+    {
+      "id": 72,
+      "scene": "Festivals and Celebrations (节日与庆祝)",
+      "words": [
+        {"word": "birthday", "meaning": "生日"},
+        {"word": "Christmas", "meaning": "圣诞节"},
+        {"word": "New Year", "meaning": "新年"},
+        {"word": "party", "meaning": "派对"},
+        {"word": "gift", "meaning": "礼物"},
+        {"word": "celebrate", "meaning": "庆祝"},
+        {"word": "fireworks", "meaning": "烟花"}
+      ]
+    },
+    {
+      "id": 73,
+      "scene": "Technology and Gadgets (科技与设备)",
+      "words": [
+        {"word": "computer", "meaning": "电脑"},
+        {"word": "smartphone", "meaning": "智能手机"},
+        {"word": "internet", "meaning": "互联网"},
+        {"word": "email", "meaning": "电子邮件"},
+        {"word": "app", "meaning": "应用程序"},
+        {"word": "download", "meaning": "下载"},
+        {"word": "battery", "meaning": "电池"}
+      ]
+    },
+    {
+      "id": 74,
+      "scene": "Emergencies and Safety (紧急情况与安全)",
+      "words": [
+        {"word": "help", "meaning": "帮助"},
+        {"word": "police", "meaning": "警察"},
+        {"word": "ambulance", "meaning": "救护车"},
+        {"word": "fire", "meaning": "火灾"},
+        {"word": "accident", "meaning": "事故"},
+        {"word": "safe", "meaning": "安全的"},
+        {"word": "danger", "meaning": "危险"}
+      ]
+    },
+    {
+      "id": 75,
+      "scene": "Personal Information (个人信息)",
+      "words": [
+        {"word": "name", "meaning": "名字"},
+        {"word": "age", "meaning": "年龄"},
+        {"word": "address", "meaning": "地址"},
+        {"word": "phone number", "meaning": "电话号码"},
+        {"word": "nationality", "meaning": "国籍"},
+        {"word": "occupation", "meaning": "职业"},
+        {"word": "hobby", "meaning": "爱好"}
+      ]
+    },
+    {
+      "id": 76,
+      "scene": "Places in Town (城镇中的地点)",
+      "words": [
+        {"word": "bank", "meaning": "银行"},
+        {"word": "hospital", "meaning": "医院"},
+        {"word": "post office", "meaning": "邮局"},
+        {"word": "library", "meaning": "图书馆"},
+        {"word": "museum", "meaning": "博物馆"},
+        {"word": "park", "meaning": "公园"},
+        {"word": "square", "meaning": "广场"},
+        {"word": "station", "meaning": "车站"}
+      ]
+    },
+    {
+      "id": 77,
+      "scene": "Services (服务设施)",
+      "words": [
+        {"word": "police station", "meaning": "警察局"},
+        {"word": "fire station", "meaning": "消防站"},
+        {"word": "pharmacy", "meaning": "药店"},
+        {"word": "dentist", "meaning": "牙医"},
+        {"word": "repair shop", "meaning": "修理店"},
+        {"word": "laundry", "meaning": "洗衣店"},
+        {"word": "service", "meaning": "服务"}
+      ]
+    },
+    {
+      "id": 78,
+      "scene": "At the Market (在市场)",
+      "words": [
+        {"word": "stall", "meaning": "摊位"},
+        {"word": "fresh", "meaning": "新鲜的"},
+        {"word": "bargain", "meaning": "讨价还价"},
+        {"word": "price", "meaning": "价格"},
+        {"word": "vendor", "meaning": "摊贩"},
+        {"word": "fruit", "meaning": "水果"},
+        {"word": "vegetable", "meaning": "蔬菜"}
+      ]
+    },
+    {
+      "id": 79,
+      "scene": "Describing Appearance (描述外貌)",
+      "words": [
+        {"word": "tall", "meaning": "高的"},
+        {"word": "short", "meaning": "矮的"},
+        {"word": "slim", "meaning": "苗条的"},
+        {"word": "hair", "meaning": "头发"},
+        {"word": "eyes", "meaning": "眼睛"},
+        {"word": "beard", "meaning": "胡须"},
+        {"word": "glasses", "meaning": "眼镜"}
+      ]
+    },
+    {
+      "id": 80,
+      "scene": "Personality and Character (个性与性格)",
+      "words": [
+        {"word": "friendly", "meaning": "友好的"},
+        {"word": "shy", "meaning": "害羞的"},
+        {"word": "kind", "meaning": "善良的"},
+        {"word": "funny", "meaning": "有趣的"},
+        {"word": "serious", "meaning": "严肃的"},
+        {"word": "lazy", "meaning": "懒惰的"},
+        {"word": "hard-working", "meaning": "勤奋的"}
+      ]
+    },
+    {
+      "id": 81,
+      "scene": "Daily Routines (日常作息)",
+      "words": [
+        {"word": "get up", "meaning": "起床"},
+        {"word": "have breakfast", "meaning": "吃早餐"},
+        {"word": "go to work", "meaning": "去上班"},
+        {"word": "have lunch", "meaning": "吃午餐"},
+        {"word": "go home", "meaning": "回家"},
+        {"word": "have dinner", "meaning": "吃晚餐"},
+        {"word": "go to bed", "meaning": "上床睡觉"}
+      ]
+    },
+    {
+      "id": 82,
+      "scene": "Hobbies and Interests (爱好与兴趣)",
+      "words": [
+        {"word": "reading", "meaning": "阅读"},
+        {"word": "painting", "meaning": "绘画"},
+        {"word": "cooking", "meaning": "烹饪"},
+        {"word": "gardening", "meaning": "园艺"},
+        {"word": "collecting", "meaning": "收藏"},
+        {"word": "playing games", "meaning": "玩游戏"},
+        {"word": "hobby", "meaning": "爱好"}
+      ]
+    },
+    {
+      "id": 83,
+      "scene": "Books and Reading (书籍与阅读)",
+      "words": [
+        {"word": "novel", "meaning": "小说"},
+        {"word": "magazine", "meaning": "杂志"},
+        {"word": "author", "meaning": "作者"},
+        {"word": "story", "meaning": "故事"},
+        {"word": "page", "meaning": "页"},
+        {"word": "library", "meaning": "图书馆"},
+        {"word": "read", "meaning": "阅读"}
+      ]
+    },
+    {
+      "id": 84,
+      "scene": "Music and Concerts (音乐与演唱会)",
+      "words": [
+        {"word": "song", "meaning": "歌曲"},
+        {"word": "album", "meaning": "专辑"},
+        {"word": "band", "meaning": "乐队"},
+        {"word": "concert", "meaning": "演唱会"},
+        {"word": "instrument", "meaning": "乐器"},
+        {"word": "listen", "meaning": "听"},
+        {"word": "singer", "meaning": "歌手"}
+      ]
+    },
+    {
+      "id": 85,
+      "scene": "Cinema and Theatre (电影院与剧院)",
+      "words": [
+        {"word": "ticket", "meaning": "票"},
+        {"word": "screen", "meaning": "银幕"},
+        {"word": "actor", "meaning": "演员"},
+        {"word": "director", "meaning": "导演"},
+        {"word": "comedy", "meaning": "喜剧"},
+        {"word": "drama", "meaning": "戏剧"},
+        {"word": "audience", "meaning": "观众"}
+      ]
+    },
+    {
+      "id": 86,
+      "scene": "Opinions and Agreeing (表达意见与同意)",
+      "words": [
+        {"word": "I think", "meaning": "我认为"},
+        {"word": "agree", "meaning": "同意"},
+        {"word": "disagree", "meaning": "不同意"},
+        {"word": "in my opinion", "meaning": "在我看来"},
+        {"word": "good idea", "meaning": "好主意"},
+        {"word": "perhaps", "meaning": "也许"}
+      ]
+    },
+    {
+      "id": 87,
+      "scene": "Apologies and Thanks (道歉与感谢)",
+      "words": [
+        {"word": "sorry", "meaning": "对不起"},
+        {"word": "excuse me", "meaning": "打扰一下"},
+        {"word": "thank you", "meaning": "谢谢"},
+        {"word": "you're welcome", "meaning": "不客气"},
+        {"word": "my fault", "meaning": "我的错"},
+        {"word": "no problem", "meaning": "没问题"}
+      ]
+    },
+    {
+      "id": 88,
+      "scene": "Requests and Suggestions (请求与建议)",
+      "words": [
+        {"word": "can you", "meaning": "你能"},
+        {"word": "could you", "meaning": "你可否"},
+        {"word": "let's", "meaning": "我们...吧"},
+        {"word": "how about", "meaning": "…怎么样"},
+        {"word": "why don't we", "meaning": "我们为什么不"},
+        {"word": "suggest", "meaning": "建议"}
+      ]
+    },
+    {
+      "id": 89,
+      "scene": "Likes and Dislikes (喜欢与不喜欢)",
+      "words": [
+        {"word": "like", "meaning": "喜欢"},
+        {"word": "love", "meaning": "非常喜欢"},
+        {"word": "hate", "meaning": "讨厌"},
+        {"word": "don't like", "meaning": "不喜欢"},
+        {"word": "prefer", "meaning": "更喜欢"},
+        {"word": "enjoy", "meaning": "享受"}
+      ]
+    },
+    {
+      "id": 90,
+      "scene": "Greetings and Farewells (问候与告别)",
+      "words": [
+        {"word": "hello", "meaning": "你好"},
+        {"word": "hi", "meaning": "嗨"},
+        {"word": "good morning", "meaning": "早上好"},
+        {"word": "goodbye", "meaning": "再见"},
+        {"word": "see you later", "meaning": "回头见"},
+        {"word": "nice to meet you", "meaning": "很高兴认识你"}
+      ]
+    },
+    {
+      "id": 91,
+      "scene": "Numbers and Quantities (数字与数量)",
+      "words": [
+        {"word": "one", "meaning": "一"},
+        {"word": "hundred", "meaning": "百"},
+        {"word": "thousand", "meaning": "千"},
+        {"word": "how many", "meaning": "多少"},
+        {"word": "a lot of", "meaning": "很多"},
+        {"word": "few", "meaning": "很少"}
+      ]
+    },
+    {
+      "id": 92,
+      "scene": "Time and Dates (时间与日期)",
+      "words": [
+        {"word": "morning", "meaning": "早晨"},
+        {"word": "afternoon", "meaning": "下午"},
+        {"word": "evening", "meaning": "晚上"},
+        {"word": "today", "meaning": "今天"},
+        {"word": "tomorrow", "meaning": "明天"},
+        {"word": "yesterday", "meaning": "昨天"},
+        {"word": "o'clock", "meaning": "点钟"}
+      ]
+    },
+    {
+      "id": 93,
+      "scene": "Colours and Shapes (颜色与形状)",
+      "words": [
+        {"word": "red", "meaning": "红色"},
+        {"word": "blue", "meaning": "蓝色"},
+        {"word": "green", "meaning": "绿色"},
+        {"word": "round", "meaning": "圆的"},
+        {"word": "square", "meaning": "方的"},
+        {"word": "big", "meaning": "大的"}
+      ]
+    },
+    {
+      "id": 94,
+      "scene": "Body and Health (身体与健康)",
+      "words": [
+        {"word": "head", "meaning": "头"},
+        {"word": "hand", "meaning": "手"},
+        {"word": "leg", "meaning": "腿"},
+        {"word": "healthy", "meaning": "健康的"},
+        {"word": "ill", "meaning": "生病的"},
+        {"word": "pain", "meaning": "疼痛"}
+      ]
+    },
+    {
+      "id": 95,
+      "scene": "Animals and Nature (动物与自然)",
+      "words": [
+        {"word": "dog", "meaning": "狗"},
+        {"word": "cat", "meaning": "猫"},
+        {"word": "bird", "meaning": "鸟"},
+        {"word": "tree", "meaning": "树"},
+        {"word": "river", "meaning": "河流"},
+        {"word": "mountain", "meaning": "山"}
+      ]
+    },
+    {
+      "id": 96,
+      "scene": "Environment (环境)",
+      "words": [
+        {"word": "pollution", "meaning": "污染"},
+        {"word": "recycle", "meaning": "回收"},
+        {"word": "protect", "meaning": "保护"},
+        {"word": "nature", "meaning": "自然"},
+        {"word": "waste", "meaning": "浪费"},
+        {"word": "clean", "meaning": "干净的"}
+      ]
+    },
+    {
+      "id": 97,
+      "scene": "Crime and Safety (犯罪与安全)",
+      "words": [
+        {"word": "police", "meaning": "警察"},
+        {"word": "steal", "meaning": "偷窃"},
+        {"word": "safe", "meaning": "安全的"},
+        {"word": "danger", "meaning": "危险"},
+        {"word": "accident", "meaning": "事故"},
+        {"word": "help", "meaning": "帮助"}
+      ]
+    },
+    {
+      "id": 98,
+      "scene": "Business and Money (商业与金钱)",
+      "words": [
+        {"word": "company", "meaning": "公司"},
+        {"word": "money", "meaning": "钱"},
+        {"word": "price", "meaning": "价格"},
+        {"word": "buy", "meaning": "买"},
+        {"word": "sell", "meaning": "卖"},
+        {"word": "pay", "meaning": "支付"}
+      ]
+    },
+    {
+      "id": 99,
+      "scene": "Formal and Informal Language (正式与非正式语言)",
+      "words": [
+        {"word": "please", "meaning": "请"},
+        {"word": "thank you", "meaning": "谢谢"},
+        {"word": "hi", "meaning": "嗨（非正式）"},
+        {"word": "hello", "meaning": "你好（正式）"},
+        {"word": "goodbye", "meaning": "再见"},
+        {"word": "see you", "meaning": "再见（非正式）"}
+      ]
+    },
+    {
+      "id": 100,
+      "scene": "General Conversation Starters (通用对话开启)",
+      "words": [
+        {"word": "How are you?", "meaning": "你好吗？"},
+        {"word": "What do you do?", "meaning": "你做什么工作？"},
+        {"word": "Where are you from?", "meaning": "你来自哪里？"},
+        {"word": "Nice weather", "meaning": "天气不错"},
+        {"word": "What time is it?", "meaning": "几点了？"},
+        {"word": "Have a nice day", "meaning": "祝你有美好的一天"}
+      ]
+    }
+  ]
+}
