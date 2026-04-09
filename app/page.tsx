@@ -1,6 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import categoriesData from "./categories.json";
+
+type ScenarioItem = {
+  id: number;
+  scene: string;
+  words: { word: string; meaning: string }[];
+};
+
+const SCENARIOS: ScenarioItem[] = categoriesData.scenarios;
 
 type WordItem = {
   id: string;
@@ -286,7 +295,7 @@ export default function HomePage() {
   const [gameState, setGameState] = useState<GameState>("idle");
   const [targetId, setTargetId] = useState<string | null>(null);
   const [planeTargetId, setPlaneTargetId] = useState<string | null>(null);
-  const [, setRecognizedText] = useState("");
+  const [recognizedText, setRecognizedText] = useState("");
   const [countdownMs, setCountdownMs] = useState(ROUND_MS);
   const [roundSeconds, setRoundSeconds] = useState(30);
   const [fallHeightPx] = useState(600);
@@ -312,6 +321,20 @@ export default function HomePage() {
   const [shooterHits, setShooterHits] = useState(0);
   const [isGameModalOpen, setIsGameModalOpen] = useState(false);
   const [startAfterOpen, setStartAfterOpen] = useState(false);
+  // ---- WebLLM 本地大模型 ----
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [llmEngine, setLlmEngine] = useState<any>(null);
+  const [llmStatus, setLlmStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [llmProgress, setLlmProgress] = useState("");
+  const [llmModelId, setLlmModelId] = useState("");
+  const [llmAvailableModels, setLlmAvailableModels] = useState<{ id: string; size: string }[]>([]);
+  const [llmGenerating, setLlmGenerating] = useState(false);
+  const [llmTopic, setLlmTopic] = useState("");
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatStreaming, setChatStreaming] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   const wordsRef = useRef<WordItem[]>([]);
   const playModeRef = useRef<PlayMode>("plane_shooter");
@@ -367,6 +390,27 @@ export default function HomePage() {
   useEffect(() => {
     fallHeightRef.current = fallHeightPx;
   }, [fallHeightPx]);
+
+  // 加载 WebLLM 可用模型列表
+  useEffect(() => {
+    import("@mlc-ai/web-llm").then(({ prebuiltAppConfig }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const all = (prebuiltAppConfig.model_list as any[])
+        .filter((m) => !m.model_type) // 排除 VLM 等非文本模型
+        .sort((a, b) => (a.vram_required_MB || 0) - (b.vram_required_MB || 0))
+        .map((m) => ({
+          id: m.model_id as string,
+          size: m.vram_required_MB ? `${(m.vram_required_MB / 1024).toFixed(1)}GB` : "",
+          lowRes: !!m.low_resource_required,
+        }));
+      if (all.length) {
+        setLlmAvailableModels(all.map((m) => ({ id: m.id, size: m.size })));
+        // 默认选第一个低资源模型
+        const defaultModel = all.find((m) => m.lowRes) || all[0];
+        setLlmModelId(defaultModel.id);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -889,6 +933,124 @@ export default function HomePage() {
     [lockPlaneTarget, playMode, resolveRound],
   );
 
+  // ---- WebLLM: 加载模型 ----
+  const loadLlmModel = useCallback(async () => {
+    if (!llmModelId || llmStatus === "loading") return;
+    setLlmStatus("loading");
+    setLlmProgress("正在初始化...");
+    try {
+      const { CreateMLCEngine } = await import("@mlc-ai/web-llm");
+      const engine = await CreateMLCEngine(llmModelId, {
+        initProgressCallback: (progress) => {
+          setLlmProgress(progress.text || "加载中...");
+        },
+      });
+      setLlmEngine(engine);
+      setLlmStatus("ready");
+      setLlmProgress("");
+    } catch (err) {
+      console.error("WebLLM load failed:", err);
+      setLlmStatus("error");
+      setLlmProgress(`加载失败: ${err}`);
+    }
+  }, [llmModelId, llmStatus]);
+
+  // 用 LLM 生成词库
+  const generateWordsWithLlm = useCallback(async () => {
+    if (!llmEngine || llmGenerating) return;
+    const topic = llmTopic.trim() || "日常生活";
+    setLlmGenerating(true);
+    try {
+      const response = await llmEngine.chat.completions.create({
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are an English vocabulary generator. Output ONLY lines in the format: english=中文翻译\nNo numbering, no extra text. Generate 10 useful English words or phrases for the given topic.",
+          },
+          {
+            role: "user",
+            content: `Topic: ${topic}`,
+          },
+        ],
+        temperature: 0.8,
+        max_tokens: 300,
+      });
+      const text = response.choices?.[0]?.message?.content?.trim() || "";
+      if (text) {
+        // 提取 xxx=xxx 格式的行
+        const lines = text
+          .split("\n")
+          .map((l: string) => l.replace(/^\d+[\.\)]\s*/, "").trim())
+          .filter((l: string) => l.includes("="));
+        if (lines.length > 0) {
+          setWordInput((prev) => {
+            const existing = prev.trim();
+            return existing ? `${existing}\n${lines.join("\n")}` : lines.join("\n");
+          });
+        }
+      }
+    } catch (err) {
+      console.error("LLM generation failed:", err);
+    } finally {
+      setLlmGenerating(false);
+    }
+  }, [llmEngine, llmGenerating, llmTopic]);
+
+  // ---- LLM 对话 ----
+  const sendChatMessage = useCallback(async () => {
+    if (!llmEngine || chatStreaming || !chatInput.trim()) return;
+    const userMsg = chatInput.trim();
+    setChatInput("");
+    const newMessages = [...chatMessages, { role: "user" as const, content: userMsg }];
+    setChatMessages(newMessages);
+    setChatStreaming(true);
+
+    try {
+      const apiMessages = [
+        {
+          role: "system" as const,
+          content: "You are a helpful English learning assistant. You can help users learn English vocabulary, grammar, and pronunciation. Answer in the language the user uses. Keep responses concise.",
+        },
+        ...newMessages,
+      ];
+
+      const stream = await llmEngine.chat.completions.create({
+        messages: apiMessages,
+        stream: true,
+        temperature: 0.7,
+        max_tokens: 500,
+      });
+
+      let assistantContent = "";
+      setChatMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+
+      for await (const chunk of stream) {
+        const delta = chunk.choices?.[0]?.delta?.content || "";
+        assistantContent += delta;
+        const captured = assistantContent;
+        setChatMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = { role: "assistant", content: captured };
+          return updated;
+        });
+      }
+    } catch (err) {
+      console.error("Chat error:", err);
+      setChatMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: `错误: ${err}` },
+      ]);
+    } finally {
+      setChatStreaming(false);
+    }
+  }, [llmEngine, chatStreaming, chatInput, chatMessages]);
+
+  // 自动滚动到最新消息
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
+
   const startSpeech = useCallback(() => {
     stopSpeech();
 
@@ -1014,6 +1176,14 @@ export default function HomePage() {
     setWordInput(picked);
     setFeedbackText(`已生成 ${safeCount} 条${difficulty === "easy" ? "初级" : difficulty === "medium" ? "中级" : "高级"}词条`);
   }, [difficulty, generateCount]);
+
+  const loadScenario = useCallback((scenarioId: number) => {
+    const scenario = SCENARIOS.find((s) => s.id === scenarioId);
+    if (!scenario) return;
+    const lines = scenario.words.map((w) => `${w.word}=${w.meaning}`).join("\n");
+    setWordInput(lines);
+    setFeedbackText(`已载入场景「${scenario.scene}」，共 ${scenario.words.length} 个词条`);
+  }, []);
 
   const loadMistakePractice = useCallback(() => {
     if (!mistakeList.length) return;
@@ -1290,6 +1460,7 @@ export default function HomePage() {
     return () => cancelAnimationFrame(id);
   }, [isGameModalOpen, startAfterOpen, startGame]);
 
+
   useEffect(() => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
 
@@ -1418,6 +1589,27 @@ export default function HomePage() {
             <p className="mt-2 text-xs text-indigo-100/85">
               支持单词和词组，例如：<code>look after=照顾</code>
             </p>
+            <div className="mt-2 flex items-center gap-2 text-xs text-indigo-100/90">
+              <span className="shrink-0">场景词库</span>
+              <select
+                onChange={(e) => {
+                  const id = Number(e.target.value);
+                  if (id) loadScenario(id);
+                }}
+                disabled={gameState === "running"}
+                defaultValue=""
+                className="flex-1 rounded-lg border border-indigo-300/35 bg-slate-900/90 px-2 py-1 text-sm text-white outline-none disabled:opacity-60"
+              >
+                <option value="" disabled>
+                  选择一个场景快速导入词库…
+                </option>
+                {SCENARIOS.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.scene}（{s.words.length}词）
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="mt-2 grid grid-cols-1 gap-2 text-xs text-indigo-100/90 md:grid-cols-[1fr_1fr_auto]">
               <label className="flex items-center gap-2">
                 <span>模式</span>
@@ -1507,6 +1699,67 @@ export default function HomePage() {
                 className="w-20 rounded-lg border border-indigo-300/35 bg-slate-900/90 px-2 py-1 text-sm text-white outline-none"
               />
               <span className="text-indigo-200/80">可自由设置</span>
+            </div>
+            <div className="mt-3 rounded-xl border border-indigo-300/25 bg-slate-900/60 p-3">
+              <p className="mb-2 text-xs font-semibold text-indigo-100/90">
+                本地 LLM（WebLLM - 浏览器端运行，需 WebGPU）
+              </p>
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <select
+                  value={llmModelId}
+                  onChange={(e) => setLlmModelId(e.target.value)}
+                  disabled={llmStatus === "loading"}
+                  className="max-w-[260px] rounded-lg border border-indigo-300/35 bg-slate-900/90 px-2 py-1 text-sm text-white outline-none disabled:opacity-60"
+                >
+                  {llmAvailableModels.length ? (
+                    llmAvailableModels.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.id} {m.size ? `(${m.size})` : ""}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">加载模型列表中...</option>
+                  )}
+                </select>
+                <button
+                  type="button"
+                  onClick={loadLlmModel}
+                  disabled={llmStatus === "loading" || !llmModelId}
+                  className="rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 px-3 py-1 text-xs font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-55"
+                >
+                  {llmStatus === "loading" ? "加载中..." : llmStatus === "ready" ? "重新加载" : "加载模型"}
+                </button>
+                {llmStatus === "ready" && (
+                  <span className="text-emerald-400 text-xs">已就绪</span>
+                )}
+                {llmStatus === "error" && (
+                  <span className="text-rose-400 text-xs">加载失败</span>
+                )}
+              </div>
+              {llmStatus === "loading" && llmProgress && (
+                <p className="mt-1.5 font-mono text-xs text-amber-200/80">
+                  {llmProgress}
+                </p>
+              )}
+              {llmStatus === "ready" && (
+                <div className="mt-2 flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="输入主题，如：旅行、医院、面试..."
+                    value={llmTopic}
+                    onChange={(e) => setLlmTopic(e.target.value)}
+                    className="flex-1 rounded-lg border border-indigo-300/35 bg-slate-900/90 px-2 py-1 text-sm text-white placeholder-indigo-300/40 outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={generateWordsWithLlm}
+                    disabled={llmGenerating}
+                    className="rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 px-3 py-1 text-xs font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-55"
+                  >
+                    {llmGenerating ? "生成中..." : "AI 生成词库"}
+                  </button>
+                </div>
+              )}
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2">
               <button
@@ -1682,7 +1935,9 @@ export default function HomePage() {
                     {playMode === "voice_match" ? "释义匹配模式" : "飞机射击模式"}
                   </p>
                   <p className="text-xs text-indigo-200/80">
-                    {gameState === "running" ? "游戏进行中（按住空格可语音识别）" : "可开始新一局或查看本局成绩"}
+                    {gameState === "running"
+                      ? "游戏进行中（按住空格可语音识别）"
+                      : "可开始新一局或查看本局成绩"}
                   </p>
                 </div>
                 {playMode === "voice_match" ? (
@@ -1715,6 +1970,13 @@ export default function HomePage() {
                 ref={gameAreaRef}
                 className="relative flex-1 overflow-hidden bg-gradient-to-b from-blue-950/50 to-slate-950/95"
               >
+                {recognizedText ? (
+                  <div className="pointer-events-none absolute bottom-3 left-1/2 z-[10] -translate-x-1/2 rounded-lg border border-indigo-300/30 bg-slate-900/85 px-4 py-2 backdrop-blur-sm">
+                    <p className="whitespace-nowrap text-sm font-medium text-indigo-100">
+                      {recognizedText}
+                    </p>
+                  </div>
+                ) : null}
                 <div className="pointer-events-none absolute inset-0 z-[1]">
                   {likeBursts.map((item) => (
                     <span
@@ -1837,6 +2099,107 @@ export default function HomePage() {
           </div>
         ) : null}
       </div>
+
+      {/* ---- LLM 对话浮窗 ---- */}
+      {llmStatus === "ready" && (
+        <>
+          {/* 悬浮按钮 */}
+          {!chatOpen && (
+            <button
+              type="button"
+              onClick={() => setChatOpen(true)}
+              className="fixed bottom-5 right-5 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-xl text-white shadow-lg transition hover:scale-110 hover:brightness-110"
+              title="与本地 AI 对话"
+            >
+              AI
+            </button>
+          )}
+
+          {/* 对话窗口 */}
+          {chatOpen && (
+            <div className="fixed bottom-5 right-5 z-50 flex h-[480px] w-[380px] flex-col rounded-2xl border border-indigo-300/30 bg-slate-950/95 shadow-2xl backdrop-blur-md">
+              {/* 标题栏 */}
+              <div className="flex items-center justify-between border-b border-indigo-300/25 px-4 py-2.5">
+                <div>
+                  <p className="text-sm font-semibold text-indigo-100">AI 助手</p>
+                  <p className="text-[10px] text-indigo-300/70">{llmModelId.split("-MLC")[0]}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setChatMessages([])}
+                    className="rounded px-2 py-0.5 text-[10px] text-indigo-300/80 transition hover:bg-indigo-400/20 hover:text-indigo-100"
+                    title="清空对话"
+                  >
+                    清空
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChatOpen(false)}
+                    className="rounded px-1.5 py-0.5 text-sm text-indigo-300/80 transition hover:bg-indigo-400/20 hover:text-indigo-100"
+                  >
+                    &times;
+                  </button>
+                </div>
+              </div>
+
+              {/* 消息列表 */}
+              <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
+                {chatMessages.length === 0 && (
+                  <p className="mt-8 text-center text-xs text-indigo-300/50">
+                    试试问我英语学习相关的问题吧！
+                  </p>
+                )}
+                {chatMessages.map((msg, i) => (
+                  <div
+                    key={i}
+                    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                  >
+                    <div
+                      className={`max-w-[85%] rounded-xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
+                        msg.role === "user"
+                          ? "bg-indigo-600/80 text-white"
+                          : "bg-slate-800/90 text-indigo-100"
+                      }`}
+                    >
+                      {msg.content || (chatStreaming && i === chatMessages.length - 1 ? "..." : "")}
+                    </div>
+                  </div>
+                ))}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* 输入区 */}
+              <div className="border-t border-indigo-300/25 px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                        e.preventDefault();
+                        sendChatMessage();
+                      }
+                    }}
+                    placeholder="输入消息..."
+                    disabled={chatStreaming}
+                    className="flex-1 rounded-lg border border-indigo-300/30 bg-slate-900/90 px-3 py-1.5 text-sm text-white placeholder-indigo-300/40 outline-none focus:border-indigo-400/60 disabled:opacity-60"
+                  />
+                  <button
+                    type="button"
+                    onClick={sendChatMessage}
+                    disabled={chatStreaming || !chatInput.trim()}
+                    className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {chatStreaming ? "..." : "发送"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </main>
   );
 }
