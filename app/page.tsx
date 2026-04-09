@@ -24,6 +24,8 @@ type WordItem = {
   speed: number;
   status: "live" | "hit" | "missed";
   exploding: boolean;
+  shuffledEn: string;
+  spellUnlocked: boolean;
 };
 
 type LikeBurst = {
@@ -62,7 +64,7 @@ type StudyBatchRecord = {
 };
 
 type GameState = "idle" | "running" | "ended";
-type PlayMode = "voice_match" | "plane_shooter";
+type PlayMode = "voice_match" | "plane_shooter" | "spell_word";
 
 type Bullet = {
   id: string;
@@ -190,6 +192,18 @@ const ROUND_MS = 30000;
 const STUDY_HISTORY_STORAGE_KEY = "english_voice_game_study_history_v1";
 const STUDY_BATCH_STORAGE_KEY = "english_voice_game_study_batch_v1";
 
+function shuffleString(str: string): string {
+  const arr = str.split("");
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  const result = arr.join("");
+  // If the shuffle didn't change it and it has >1 char, try again
+  if (result === str && str.length > 1) return shuffleString(str);
+  return result;
+}
+
 function normalizeText(text: string): string {
   return text
     .toLowerCase()
@@ -278,6 +292,8 @@ function parseWordList(raw: string, width: number): WordItem[] {
       speed: 46 + Math.random() * 26,
       status: "live",
       exploding: false,
+      shuffledEn: shuffleString(en.toLowerCase()),
+      spellUnlocked: false,
     });
   }
 
@@ -333,6 +349,9 @@ export default function HomePage() {
   const [llmTopic, setLlmTopic] = useState("");
   const [llmChatOpen, setLlmChatOpen] = useState(false);
   const [llmModelFilter, setLlmModelFilter] = useState("");
+  // ---- 拼单词模式 ----
+  const [spellInput, setSpellInput] = useState<string[]>([]);
+  const [spellTargetId, setSpellTargetId] = useState<string | null>(null);
   const [llmDropdownOpen, setLlmDropdownOpen] = useState(false);
   const llmDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -353,6 +372,7 @@ export default function HomePage() {
   const targetRef = useRef<string | null>(null);
   const spaceHoldRef = useRef(false);
   const [, setIsHoldingSpace] = useState(false);
+  const spellTargetIdRef = useRef<string | null>(null);
 
   const currentMeaning = useMemo(() => {
     if (!targetId) return gameState === "running" ? "准备下一题..." : "点击开始游戏";
@@ -736,6 +756,75 @@ export default function HomePage() {
       },
     ]);
   }, [clearPlaneTarget, gameState]);
+
+  // ---- 拼单词模式：选择下一个目标 ----
+  const pickNextSpellTarget = useCallback((wordList?: WordItem[]) => {
+    const list = wordList || wordsRef.current;
+    // Pick the lowest live, non-unlocked word (closest to bottom = most urgent)
+    const candidates = list.filter((w) => w.status === "live" && !w.spellUnlocked);
+    if (!candidates.length) {
+      setSpellTargetId(null);
+      spellTargetIdRef.current = null;
+      setSpellInput([]);
+      return;
+    }
+    // Pick the one with highest y (closest to falling out)
+    const next = candidates.reduce((a, b) => (a.y > b.y ? a : b));
+    setSpellTargetId(next.id);
+    spellTargetIdRef.current = next.id;
+    setSpellInput([]);
+  }, []);
+
+  // ---- 拼单词模式：确认拼写 ----
+  const confirmSpell = useCallback(() => {
+    const tid = spellTargetIdRef.current;
+    if (!tid) return;
+    const target = wordsRef.current.find((w) => w.id === tid && w.status === "live");
+    if (!target) { pickNextSpellTarget(); return; }
+
+    const typed = spellInput.join("").toLowerCase();
+    const correct = target.normalized.replace(/\s+/g, "");
+
+    if (typed === correct) {
+      // Correct → explode immediately
+      setWords((prev) => {
+        const updated = prev.map((w) =>
+          w.id === tid ? { ...w, status: "hit" as const, exploding: true, revealedEn: true } : w
+        );
+        wordsRef.current = updated;
+        return updated;
+      });
+      // Remove explosion after animation
+      setTimeout(() => {
+        setWords((prev) => {
+          const updated = prev.map((w) =>
+            w.id === tid ? { ...w, exploding: false } : w
+          );
+          wordsRef.current = updated;
+          return updated;
+        });
+      }, 360);
+      emitLikeBurst();
+      bumpStudyHistory({ en: target.en, zh: target.zh }, "correct");
+      bumpBatchResult("correct");
+      setShooterHits((v) => v + 1);
+      setDoneCount((v) => v + 1);
+      setSpellInput([]);
+      setTimeout(() => pickNextSpellTarget(), 300);
+    } else {
+      // Wrong: count as error, shake feedback, clear input
+      setFeedbackText(`拼写错误！正确: ${target.en}`);
+      const key = `${target.normalized}|${target.zh}`;
+      setMistakeMap((prevMap) => {
+        const existing = prevMap[key];
+        return {
+          ...prevMap,
+          [key]: { key, en: target.en, zh: target.zh, count: (existing?.count || 0) + 1 },
+        };
+      });
+      setSpellInput([]);
+    }
+  }, [spellInput, pickNextSpellTarget, emitLikeBurst, bumpStudyHistory, bumpBatchResult]);
 
   const stopSpeech = useCallback(() => {
     const rec = speechRef.current;
@@ -1141,6 +1230,9 @@ export default function HomePage() {
     setRecognizedText("");
     setCountdownMs(0);
     setBullets([]);
+    setSpellTargetId(null);
+    spellTargetIdRef.current = null;
+    setSpellInput([]);
     currentBatchIdRef.current = null;
     lastFrameTsRef.current = null;
     clearRaf();
@@ -1268,7 +1360,7 @@ export default function HomePage() {
           let nextX = w.x + w.vx * deltaSec;
           const areaW = gameAreaRef.current?.clientWidth ?? 900;
           let nextVx = w.vx;
-          if (mode === "plane_shooter") {
+          if (mode === "plane_shooter" || mode === "spell_word") {
             if (nextX < 4) {
               nextX = 4;
               nextVx = Math.abs(nextVx || 40);
@@ -1283,7 +1375,7 @@ export default function HomePage() {
 
           const nextY = w.y + w.speed * deltaSec;
           const bottom =
-            mode === "plane_shooter"
+            (mode === "plane_shooter" || mode === "spell_word")
               ? -40 + fallHeightRef.current
               : gameAreaRef.current?.clientHeight ?? 500;
           const isDropOut = nextY > bottom - 24;
@@ -1291,10 +1383,13 @@ export default function HomePage() {
           if (isDropOut) {
             if (mode === "voice_match" && w.id === targetRef.current) {
               targetDropped = true;
-            } else if (mode === "plane_shooter") {
+            } else if (mode === "plane_shooter" || mode === "spell_word") {
               if (w.id === planeTargetIdRef.current) {
                 clearPlaneTarget();
                 setFeedbackText(`目标 ${w.en} 已掉落，请重新语音锁定`);
+              }
+              if (mode === "spell_word" && w.id === spellTargetIdRef.current) {
+                setTimeout(() => pickNextSpellTarget(), 0);
               }
               setDoneCount((v) => v + 1);
               bumpStudyHistory({ en: w.en, zh: w.zh }, "wrong");
@@ -1324,7 +1419,7 @@ export default function HomePage() {
           setTimeout(() => resolveRound("miss"), 0);
         }
 
-        if (!hasLive && (mode === "plane_shooter" || !targetRef.current)) {
+        if (!hasLive && (mode === "plane_shooter" || mode === "spell_word" || !targetRef.current)) {
           setTimeout(endGame, 0);
         }
 
@@ -1346,7 +1441,7 @@ export default function HomePage() {
 
       rafRef.current = requestAnimationFrame(gameLoop);
     },
-    [bumpBatchResult, bumpStudyHistory, clearPlaneTarget, endGame, hitPlaneTarget, resolveRound],
+    [bumpBatchResult, bumpStudyHistory, clearPlaneTarget, endGame, hitPlaneTarget, resolveRound, pickNextSpellTarget],
   );
 
   const startGame = useCallback(() => {
@@ -1372,14 +1467,19 @@ export default function HomePage() {
     setFeedbackText(
       playMode === "voice_match"
         ? "开局成功，准备进入第一题"
-        : planeDropChineseOnly
-          ? "中文下落模式：按住空格说英文，目标会变红；再用左右键移动、上方向键发射"
-          : "按住空格说出单词锁定红色目标，再用左右键移动飞机、上方向键发射",
+        : playMode === "spell_word"
+          ? "看中文提示，在键盘上拼出正确的英文单词，按回车确认"
+          : planeDropChineseOnly
+            ? "中文下落模式：按住空格说英文，目标会变红；再用左右键移动、上方向键发射"
+            : "按住空格说出单词锁定红色目标，再用左右键移动飞机、上方向键发射",
     );
     setRecognizedText("");
     setShooterHits(0);
     setBullets([]);
     setPlaneTargetId(null);
+    setSpellTargetId(null);
+    spellTargetIdRef.current = null;
+    setSpellInput([]);
     lastFrameTsRef.current = null;
     planeTargetIdRef.current = null;
     planeMoveDirRef.current = 0;
@@ -1393,20 +1493,23 @@ export default function HomePage() {
     planeXRef.current = areaW / 2;
 
     const gameHeight = gameAreaRef.current?.clientHeight ?? 500;
-    const fallDistance = playMode === "plane_shooter" ? Math.max(220, fallHeightPx) : Math.max(60, gameHeight - 24);
+    const fallDistance = (playMode === "plane_shooter" || playMode === "spell_word") ? Math.max(220, fallHeightPx) : Math.max(60, gameHeight - 24);
     const baseSpeed = fallDistance / roundSeconds;
     const revealByDefault = !(playMode === "plane_shooter" && planeDropChineseOnly);
     const syncedWords = parsed.map((w, idx) => {
-      if (playMode === "plane_shooter") {
+      if (playMode === "plane_shooter" || playMode === "spell_word") {
         const laneX = ((idx % 8) + 1) * (areaW / 9);
         const vx = (Math.random() < 0.5 ? -1 : 1) * (40 + Math.random() * 120);
-        const speed = baseSpeed * (0.75 + Math.random() * 0.7);
+        const speed = playMode === "spell_word"
+          ? baseSpeed * (0.5 + Math.random() * 0.4)
+          : baseSpeed * (0.75 + Math.random() * 0.7);
         return {
           ...w,
-          revealedEn: revealByDefault,
+          revealedEn: playMode === "spell_word" ? false : revealByDefault,
           x: clamp(laneX, 6, areaW - 100),
           vx,
           speed,
+          shuffledEn: shuffleString(w.en.toLowerCase()),
         };
       }
       return { ...w, revealedEn: true, vx: 0, speed: baseSpeed };
@@ -1416,6 +1519,10 @@ export default function HomePage() {
 
     if (playMode === "voice_match") {
       nextRound(syncedWords);
+    } else if (playMode === "spell_word") {
+      askingRef.current = true;
+      setCountdownMs(0);
+      pickNextSpellTarget(syncedWords);
     } else {
       askingRef.current = true;
       targetRef.current = null;
@@ -1426,7 +1533,7 @@ export default function HomePage() {
 
     clearRaf();
     rafRef.current = requestAnimationFrame(gameLoop);
-  }, [wordInput, playMode, fallHeightPx, addSeenHistoryBatch, registerStudyBatch, nextRound, clearRaf, gameLoop, roundSeconds, planeDropChineseOnly]);
+  }, [wordInput, playMode, fallHeightPx, addSeenHistoryBatch, registerStudyBatch, nextRound, clearRaf, gameLoop, roundSeconds, planeDropChineseOnly, pickNextSpellTarget]);
 
   const stopGame = useCallback(() => {
     endGame();
@@ -1495,6 +1602,25 @@ export default function HomePage() {
       const activeTag = (document.activeElement as HTMLElement | null)?.tagName;
       if (activeTag === "INPUT" || activeTag === "TEXTAREA") return;
 
+      // 拼单词模式：捕获字母、退格、回车
+      if (playMode === "spell_word" && gameState === "running") {
+        if (event.key === "Backspace") {
+          event.preventDefault();
+          setSpellInput((prev) => prev.slice(0, -1));
+          return;
+        }
+        if (event.key === "Enter") {
+          event.preventDefault();
+          confirmSpell();
+          return;
+        }
+        if (/^[a-zA-Z]$/.test(event.key) && !event.repeat) {
+          event.preventDefault();
+          setSpellInput((prev) => [...prev, event.key.toLowerCase()]);
+          return;
+        }
+      }
+
       if (event.code === "ArrowLeft" || event.code === "ArrowRight" || event.code === "ArrowUp") {
         if (gameState !== "running" || playMode !== "plane_shooter") return;
         event.preventDefault();
@@ -1556,7 +1682,7 @@ export default function HomePage() {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
     };
-  }, [firePlaneBullet, gameState, playMode, startSpeech, stopSpeech]);
+  }, [firePlaneBullet, gameState, playMode, startSpeech, stopSpeech, confirmSpell]);
 
   useEffect(() => {
     return () => {
@@ -1624,6 +1750,7 @@ export default function HomePage() {
                 >
                   <option value="voice_match">释义匹配</option>
                   <option value="plane_shooter">飞机射击</option>
+                  <option value="spell_word">拼单词</option>
                 </select>
               </label>
               <label className="flex items-center gap-2">
@@ -1946,15 +2073,15 @@ export default function HomePage() {
 
         {isGameModalOpen ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-3 md:p-6">
-            <div className="relative flex h-[88vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-indigo-200/35 bg-slate-950/95 shadow-2xl">
+            <div className={`relative flex w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-indigo-200/35 bg-slate-950/95 shadow-2xl ${playMode === "spell_word" ? "h-[70vh]" : "h-[88vh]"}`}>
               <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-b border-indigo-300/30 bg-slate-950/95 px-4 py-3">
                 <div className="justify-self-start">
                   <p className="text-sm font-semibold text-indigo-100">
-                    {playMode === "voice_match" ? "释义匹配模式" : "飞机射击模式"}
+                    {playMode === "voice_match" ? "释义匹配模式" : playMode === "spell_word" ? "拼单词模式" : "飞机射击模式"}
                   </p>
                   <p className="text-xs text-indigo-200/80">
                     {gameState === "running"
-                      ? "游戏进行中（按住空格可语音识别）"
+                      ? playMode === "spell_word" ? "用键盘拼出正确单词，按回车确认" : "游戏进行中（按住空格可语音识别）"
                       : "可开始新一局或查看本局成绩"}
                   </p>
                 </div>
@@ -2036,30 +2163,83 @@ export default function HomePage() {
                     playMode === "voice_match" && targetId === word.id && word.status === "live";
                   const isPlaneTarget =
                     playMode === "plane_shooter" && planeTargetId === word.id && word.status === "live";
+                  const isSpellTarget =
+                    playMode === "spell_word" && spellTargetId === word.id && word.status === "live";
                   const baseClass =
                     word.status === "missed"
                       ? "border-rose-200/70 text-rose-100 opacity-55"
                       : "border-indigo-200/65 text-slate-100";
+
+                  // Determine displayed text
+                  let displayText: string;
+                  if (playMode === "spell_word") {
+                    if (word.spellUnlocked || word.status === "hit") {
+                      displayText = word.en;
+                    } else {
+                      // Show: scrambled letters + chinese meaning
+                      displayText = `${word.shuffledEn}  (${word.zh})`;
+                    }
+                  } else if (playMode === "plane_shooter") {
+                    displayText = word.revealedEn ? word.en : word.zh;
+                  } else {
+                    displayText = word.en;
+                  }
 
                   return (
                     <div
                       key={word.id}
                       className={[
                         "absolute top-0 rounded-xl border px-3 py-1.5 text-lg font-bold tracking-wide shadow",
-                        isPlaneTarget ? "bg-rose-900/90" : "bg-blue-950/90",
+                        isPlaneTarget ? "bg-rose-900/90" : isSpellTarget ? "bg-amber-900/90" : "bg-blue-950/90",
                         baseClass,
                         isVoiceTarget ? "border-emerald-300 shadow-emerald-400/30" : "",
                         isPlaneTarget ? "border-rose-300 shadow-rose-400/30" : "",
+                        isSpellTarget ? "border-amber-300 shadow-amber-400/40" : "",
+                        word.spellUnlocked ? "border-emerald-400 bg-emerald-900/80" : "",
                         word.exploding ? "animate-boom" : "",
                       ].join(" ")}
                       style={{ left: `${word.x}px`, transform: `translateY(${word.y}px)` }}
                     >
-                      {playMode === "plane_shooter"
-                        ? (word.revealedEn ? word.en : word.zh)
-                        : word.en}
+                      {playMode === "spell_word" && isSpellTarget ? (
+                        <span className="flex items-center gap-1">
+                          {word.shuffledEn.split("").map((ch, i) => (
+                            <span key={i} className="inline-flex h-7 w-6 items-center justify-center rounded border border-amber-300/50 bg-amber-950/60 text-base text-amber-100">
+                              {ch}
+                            </span>
+                          ))}
+                          <span className="ml-1.5 text-sm font-normal text-amber-200/70">({word.zh})</span>
+                        </span>
+                      ) : displayText}
                     </div>
                   );
                 })}
+
+                {/* 拼单词模式：底部输入显示区 */}
+                {playMode === "spell_word" && gameState === "running" && (
+                  <div className="absolute bottom-0 left-0 right-0 z-[10] flex flex-col items-center gap-2 border-t border-indigo-300/20 bg-slate-950/90 px-4 py-3 backdrop-blur-sm">
+                    <div className="flex items-center gap-1.5">
+                      {spellInput.length === 0 ? (
+                        <span className="text-sm text-indigo-300/50">在键盘上输入字母...</span>
+                      ) : (
+                        spellInput.map((ch, i) => (
+                          <span
+                            key={i}
+                            className="inline-flex h-9 w-8 items-center justify-center rounded-lg border-2 border-indigo-400/60 bg-indigo-950/80 text-lg font-bold text-white shadow"
+                          >
+                            {ch}
+                          </span>
+                        ))
+                      )}
+                      <span className="inline-flex h-9 w-8 items-center justify-center rounded-lg border-2 border-dashed border-indigo-400/30 text-indigo-400/40">
+                        _
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-indigo-300/60">
+                      <span>Backspace 删除</span>
+                      <span>Enter 确认</span>
+                    </div>
+                  </div>
+                )}
 
                 {gameState !== "running" ? (
                   <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/55 p-4 text-center">
@@ -2081,6 +2261,11 @@ export default function HomePage() {
                           <p className="mt-1 text-3xl font-black text-emerald-300">
                             {playMode === "voice_match" ? `评分：${score} / 10` : `成绩：${shooterHits}`}
                           </p>
+                          {playMode === "spell_word" && (
+                            <p className="mt-1 text-sm text-indigo-200/80">
+                              拼写正确并击中 {shooterHits} 个单词
+                            </p>
+                          )}
                           <p className="mt-2 text-sm text-indigo-100/85">修改词库后可再次开始</p>
                           <button
                             type="button"
@@ -2092,7 +2277,13 @@ export default function HomePage() {
                         </>
                       ) : (
                         <>
-                          {playMode === "voice_match" ? (
+                          {playMode === "spell_word" ? (
+                            <>
+                              <p className="mt-2 text-indigo-100">单词从上方掉落，字母顺序被打乱。</p>
+                              <p className="mt-1 text-indigo-100">在键盘上拼出正确的英文单词，按 Enter 确认。</p>
+                              <p className="mt-1 text-indigo-100">拼写正确后子弹会自动击中目标！</p>
+                            </>
+                          ) : playMode === "voice_match" ? (
                             <>
                               <p className="mt-2 text-indigo-100">看到中文后，在限时内按住空格说出对应英文。</p>
                               <p className="mt-1 text-indigo-100">匹配成功时单词会爆炸消失，全部完成后自动评分。</p>
