@@ -382,6 +382,14 @@ export default function HomePage() {
   const [, setIsHoldingSpace] = useState(false);
   const spellTargetIdRef = useRef<string | null>(null);
   const spellSpeechLenRef = useRef(0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const llmEngineRef = useRef<any>(null);
+  const llmParsingRef = useRef(false);
+
+  // Keep llmEngineRef in sync
+  useEffect(() => {
+    llmEngineRef.current = llmEngine;
+  }, [llmEngine]);
 
   const currentMeaning = useMemo(() => {
     if (!targetId) return gameState === "running" ? "准备下一题..." : "点击开始游戏";
@@ -980,14 +988,67 @@ export default function HomePage() {
       const candidates = liveWords.filter((w) => w.status === "live");
       if (!candidates.length) return;
 
-      // 拼单词模式：语音识别到的文字拆成字母，只追加新增部分
+      // 拼单词模式：将语音文本交给 LLM 分析字母，若无 LLM 则回退到直接提取
       if (playMode === "spell_word") {
-        const allLetters = normalized.replace(/[^a-z]/g, "").split("").filter(Boolean);
-        const newLetters = allLetters.slice(spellSpeechLenRef.current);
-        if (newLetters.length > 0) {
-          spellSpeechLenRef.current = allLetters.length;
-          setSpellInput((prev) => [...prev, ...newLetters]);
-          setRecognizedText(`语音: ${allLetters.join("").toUpperCase()}`);
+        const engine = llmEngineRef.current;
+        if (engine && !llmParsingRef.current) {
+          llmParsingRef.current = true;
+          setRecognizedText(`语音: "${raw}" — LLM 分析中...`);
+          (async () => {
+            try {
+              const resp = await engine.chat.completions.create({
+                messages: [
+                  {
+                    role: "system",
+                    content:
+                      "You are a letter extraction assistant. The user is spelling out an English word by saying letters one by one via voice recognition. "
+                      + "Analyze the speech-to-text result and extract the individual English letters the user intended to say, in order. "
+                      + "Common patterns: 'ay' or 'a' = A, 'bee' or 'be' = B, 'see' or 'sea' = C, 'dee' = D, 'ee' = E, 'ef' or 'eff' = F, "
+                      + "'gee' or 'ji' = G, 'aitch' or 'H' = H, 'eye' or 'I' = I, 'jay' = J, 'kay' = K, 'el' or 'ell' = L, 'em' = M, "
+                      + "'en' = N, 'oh' or 'o' = O, 'pee' or 'P' = P, 'queue' or 'cue' = Q, 'are' or 'ar' = R, 'es' or 'ess' = S, "
+                      + "'tee' or 'T' = T, 'you' or 'u' = U, 'vee' = V, 'double you' or 'double u' = W, 'ex' = X, 'why' or 'Y' = Y, 'zee' or 'zed' = Z. "
+                      + "Output ONLY the uppercase letters with no spaces, punctuation, or explanation. Example: if input is 'ay bee see', output 'ABC'.",
+                  },
+                  { role: "user", content: raw },
+                ],
+                temperature: 0,
+                max_tokens: 50,
+              });
+              const result = resp.choices?.[0]?.message?.content?.trim() || "";
+              const letters = result.replace(/[^a-zA-Z]/g, "").toLowerCase().split("").filter(Boolean);
+              if (letters.length > 0) {
+                const newLetters = letters.slice(spellSpeechLenRef.current);
+                if (newLetters.length > 0) {
+                  spellSpeechLenRef.current = letters.length;
+                  setSpellInput((prev) => [...prev, ...newLetters]);
+                  setRecognizedText(`语音: "${raw}" → LLM: ${letters.join("").toUpperCase()}`);
+                }
+              } else {
+                setRecognizedText(`语音: "${raw}" — LLM 未识别到字母`);
+              }
+            } catch (err) {
+              console.error("LLM spell parse error:", err);
+              // Fallback: extract letters directly
+              const allLetters = normalized.replace(/[^a-z]/g, "").split("").filter(Boolean);
+              const newLetters = allLetters.slice(spellSpeechLenRef.current);
+              if (newLetters.length > 0) {
+                spellSpeechLenRef.current = allLetters.length;
+                setSpellInput((prev) => [...prev, ...newLetters]);
+                setRecognizedText(`语音: ${allLetters.join("").toUpperCase()}（LLM不可用，直接提取）`);
+              }
+            } finally {
+              llmParsingRef.current = false;
+            }
+          })();
+        } else if (!engine) {
+          // No LLM available, fallback to direct extraction
+          const allLetters = normalized.replace(/[^a-z]/g, "").split("").filter(Boolean);
+          const newLetters = allLetters.slice(spellSpeechLenRef.current);
+          if (newLetters.length > 0) {
+            spellSpeechLenRef.current = allLetters.length;
+            setSpellInput((prev) => [...prev, ...newLetters]);
+            setRecognizedText(`语音: ${allLetters.join("").toUpperCase()}`);
+          }
         }
         return;
       }
