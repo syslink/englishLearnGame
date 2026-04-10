@@ -2349,7 +2349,7 @@ export default function HomePage() {
       </div>
 
       {/* LLM 对话浮窗 */}
-      {<LlmChat engine={llmEngine} modelId={llmModelId} open={llmChatOpen} onClose={() => setLlmChatOpen(false)} />}
+      {<LlmChat engine={llmEngine} modelId={llmModelId} open={llmChatOpen} onClose={() => setLlmChatOpen(false)} selectedVoiceURI={selectedVoiceURI} ttsVoices={ttsVoices} />}
     </main>
   );
 }
