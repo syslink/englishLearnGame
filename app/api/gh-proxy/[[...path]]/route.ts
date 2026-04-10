@@ -4,8 +4,7 @@ const GH_RAW = "https://raw.githubusercontent.com";
 
 /**
  * Catch-all proxy for raw.githubusercontent.com (model_lib wasm files).
- * /api/gh-proxy/mlc-ai/binary-mlc-llm-libs/main/file.wasm
- * -> https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/file.wasm
+ * Supports Range requests for resume downloads.
  */
 export async function GET(
   req: NextRequest,
@@ -20,32 +19,38 @@ export async function GET(
   const targetUrl = `${GH_RAW}/${targetPath}`;
 
   try {
-    const upstream = await fetch(targetUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; gh-proxy)",
-      },
-    });
+    const upstreamHeaders: Record<string, string> = {
+      "User-Agent": "Mozilla/5.0 (compatible; gh-proxy)",
+    };
+    const range = req.headers.get("range");
+    if (range) {
+      upstreamHeaders["Range"] = range;
+    }
 
-    if (!upstream.ok) {
+    const upstream = await fetch(targetUrl, { headers: upstreamHeaders });
+
+    if (!upstream.ok && upstream.status !== 206) {
       return new NextResponse(`Upstream error: ${upstream.status}`, {
         status: upstream.status,
       });
     }
 
-    const contentType =
-      upstream.headers.get("content-type") || "application/octet-stream";
-    const contentLength = upstream.headers.get("content-length");
-
     const headers: Record<string, string> = {
-      "Content-Type": contentType,
+      "Content-Type": upstream.headers.get("content-type") || "application/octet-stream",
       "Access-Control-Allow-Origin": "*",
+      "Accept-Ranges": "bytes",
       "Cache-Control": "public, max-age=86400",
     };
-    if (contentLength) {
-      headers["Content-Length"] = contentLength;
+
+    for (const key of ["content-length", "content-range"]) {
+      const val = upstream.headers.get(key);
+      if (val) headers[key] = val;
     }
 
-    return new NextResponse(upstream.body, { status: 200, headers });
+    return new NextResponse(upstream.body, {
+      status: upstream.status,
+      headers,
+    });
   } catch (err) {
     console.error("GH proxy error:", err);
     return NextResponse.json({ error: String(err) }, { status: 502 });

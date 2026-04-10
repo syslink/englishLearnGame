@@ -5,6 +5,7 @@ const HF_MIRROR = "https://hf-mirror.com";
 /**
  * Catch-all proxy: /api/hf-proxy/mlc-ai/Model/resolve/main/file.bin
  * -> https://hf-mirror.com/mlc-ai/Model/resolve/main/file.bin
+ * Supports Range requests for resume downloads.
  */
 export async function GET(
   req: NextRequest,
@@ -19,32 +20,38 @@ export async function GET(
   const mirrorUrl = `${HF_MIRROR}/${targetPath}`;
 
   try {
-    const upstream = await fetch(mirrorUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; hf-proxy)",
-      },
-    });
+    const upstreamHeaders: Record<string, string> = {
+      "User-Agent": "Mozilla/5.0 (compatible; hf-proxy)",
+    };
+    const range = req.headers.get("range");
+    if (range) {
+      upstreamHeaders["Range"] = range;
+    }
 
-    if (!upstream.ok) {
+    const upstream = await fetch(mirrorUrl, { headers: upstreamHeaders });
+
+    if (!upstream.ok && upstream.status !== 206) {
       return new NextResponse(`Upstream error: ${upstream.status}`, {
         status: upstream.status,
       });
     }
 
-    const contentType =
-      upstream.headers.get("content-type") || "application/octet-stream";
-    const contentLength = upstream.headers.get("content-length");
-
     const headers: Record<string, string> = {
-      "Content-Type": contentType,
+      "Content-Type": upstream.headers.get("content-type") || "application/octet-stream",
       "Access-Control-Allow-Origin": "*",
+      "Accept-Ranges": "bytes",
       "Cache-Control": "public, max-age=86400",
     };
-    if (contentLength) {
-      headers["Content-Length"] = contentLength;
+
+    for (const key of ["content-length", "content-range"]) {
+      const val = upstream.headers.get(key);
+      if (val) headers[key] = val;
     }
 
-    return new NextResponse(upstream.body, { status: 200, headers });
+    return new NextResponse(upstream.body, {
+      status: upstream.status,
+      headers,
+    });
   } catch (err) {
     console.error("HF proxy error:", err);
     return NextResponse.json({ error: String(err) }, { status: 502 });

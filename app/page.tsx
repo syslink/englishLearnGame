@@ -350,7 +350,15 @@ export default function HomePage() {
   const [llmChatOpen, setLlmChatOpen] = useState(false);
   const [llmModelFilter, setLlmModelFilter] = useState("");
   // ---- 拼单词模式 ----
-  const [spellInput, setSpellInput] = useState<string[]>([]);
+  const [spellInput, _setSpellInput] = useState<string[]>([]);
+  const spellInputRef = useRef<string[]>([]);
+  const setSpellInput = useCallback((v: string[] | ((prev: string[]) => string[])) => {
+    _setSpellInput((prev) => {
+      const next = typeof v === "function" ? v(prev) : v;
+      spellInputRef.current = next;
+      return next;
+    });
+  }, []);
   const [spellTargetId, setSpellTargetId] = useState<string | null>(null);
   const [llmDropdownOpen, setLlmDropdownOpen] = useState(false);
   const llmDropdownRef = useRef<HTMLDivElement>(null);
@@ -373,6 +381,7 @@ export default function HomePage() {
   const spaceHoldRef = useRef(false);
   const [, setIsHoldingSpace] = useState(false);
   const spellTargetIdRef = useRef<string | null>(null);
+  const spellSpeechLenRef = useRef(0);
 
   const currentMeaning = useMemo(() => {
     if (!targetId) return gameState === "running" ? "准备下一题..." : "点击开始游戏";
@@ -766,6 +775,7 @@ export default function HomePage() {
       setSpellTargetId(null);
       spellTargetIdRef.current = null;
       setSpellInput([]);
+      spellSpeechLenRef.current = 0;
       return;
     }
     // Pick the one with highest y (closest to falling out)
@@ -773,16 +783,18 @@ export default function HomePage() {
     setSpellTargetId(next.id);
     spellTargetIdRef.current = next.id;
     setSpellInput([]);
+    spellSpeechLenRef.current = 0;
   }, []);
 
-  // ---- 拼单词模式：确认拼写 ----
-  const confirmSpell = useCallback(() => {
+  // ---- 拼单词模式：确认拼写（可接受外部传入的字母，供语音回调使用） ----
+  const confirmSpell = useCallback((overrideLetters?: string[]) => {
     const tid = spellTargetIdRef.current;
     if (!tid) return;
     const target = wordsRef.current.find((w) => w.id === tid && w.status === "live");
     if (!target) { pickNextSpellTarget(); return; }
 
-    const typed = spellInput.join("").toLowerCase();
+    const letters = overrideLetters || spellInputRef.current;
+    const typed = letters.join("").toLowerCase();
     const correct = target.normalized.replace(/\s+/g, "");
 
     if (typed === correct) {
@@ -824,7 +836,7 @@ export default function HomePage() {
       });
       setSpellInput([]);
     }
-  }, [spellInput, pickNextSpellTarget, emitLikeBurst, bumpStudyHistory, bumpBatchResult]);
+  }, [pickNextSpellTarget, emitLikeBurst, bumpStudyHistory, bumpBatchResult]);
 
   const stopSpeech = useCallback(() => {
     const rec = speechRef.current;
@@ -968,6 +980,18 @@ export default function HomePage() {
       const candidates = liveWords.filter((w) => w.status === "live");
       if (!candidates.length) return;
 
+      // 拼单词模式：语音识别到的文字拆成字母，只追加新增部分
+      if (playMode === "spell_word") {
+        const allLetters = normalized.replace(/[^a-z]/g, "").split("").filter(Boolean);
+        const newLetters = allLetters.slice(spellSpeechLenRef.current);
+        if (newLetters.length > 0) {
+          spellSpeechLenRef.current = allLetters.length;
+          setSpellInput((prev) => [...prev, ...newLetters]);
+          setRecognizedText(`语音: ${allLetters.join("").toUpperCase()}`);
+        }
+        return;
+      }
+
       if (playMode === "plane_shooter") {
         let bestShooter: { word: WordItem; score: number } | null = null;
         for (const c of candidates) {
@@ -1032,7 +1056,7 @@ export default function HomePage() {
         setFeedbackText(`你说的是 "${matchedWord.en}"，本题目标是 "${target.en}"`);
       }
     },
-    [lockPlaneTarget, playMode, resolveRound],
+    [lockPlaneTarget, playMode, resolveRound, setSpellInput],
   );
 
   // ---- WebLLM: 加载模型 ----
@@ -1040,36 +1064,48 @@ export default function HomePage() {
     if (!llmModelId || llmStatus === "loading") return;
     setLlmStatus("loading");
     setLlmProgress("正在初始化...");
-    try {
-      const { CreateMLCEngine, prebuiltAppConfig } = await import("@mlc-ai/web-llm");
-      // 通过本地 API 代理下载模型，避免 CORS 和网络问题
-      const origin = window.location.origin;
-      const mirrorAppConfig = {
-        ...prebuiltAppConfig,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        model_list: (prebuiltAppConfig.model_list as any[]).map((m) => ({
-          ...m,
-          model: typeof m.model === "string"
-            ? m.model.replace("https://huggingface.co", `${origin}/api/hf-proxy`)
-            : m.model,
-          model_lib: typeof m.model_lib === "string"
-            ? m.model_lib.replace("https://raw.githubusercontent.com", `${origin}/api/gh-proxy`)
-            : m.model_lib,
-        })),
-      };
-      const engine = await CreateMLCEngine(llmModelId, {
-        appConfig: mirrorAppConfig,
-        initProgressCallback: (progress) => {
-          setLlmProgress(progress.text || "加载中...");
-        },
-      });
-      setLlmEngine(engine);
-      setLlmStatus("ready");
-      setLlmProgress("");
-    } catch (err) {
-      console.error("WebLLM load failed:", err);
-      setLlmStatus("error");
-      setLlmProgress(`加载失败: ${err}`);
+
+    const { CreateMLCEngine, prebuiltAppConfig } = await import("@mlc-ai/web-llm");
+    const origin = window.location.origin;
+    const mirrorAppConfig = {
+      ...prebuiltAppConfig,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      model_list: (prebuiltAppConfig.model_list as any[]).map((m) => ({
+        ...m,
+        model: typeof m.model === "string"
+          ? m.model.replace("https://huggingface.co", `${origin}/api/hf-proxy`)
+          : m.model,
+        model_lib: typeof m.model_lib === "string"
+          ? m.model_lib.replace("https://raw.githubusercontent.com", `${origin}/api/gh-proxy`)
+          : m.model_lib,
+      })),
+    };
+
+    // 自动重试：已缓存的分片会被跳过，只下载剩余文件
+    const MAX_RETRIES = 3;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const engine = await CreateMLCEngine(llmModelId, {
+          appConfig: mirrorAppConfig,
+          initProgressCallback: (progress) => {
+            const prefix = attempt > 1 ? `[重试 ${attempt}/${MAX_RETRIES}] ` : "";
+            setLlmProgress(prefix + (progress.text || "加载中..."));
+          },
+        });
+        setLlmEngine(engine);
+        setLlmStatus("ready");
+        setLlmProgress("");
+        return;
+      } catch (err) {
+        console.error(`WebLLM load attempt ${attempt}/${MAX_RETRIES} failed:`, err);
+        if (attempt < MAX_RETRIES) {
+          setLlmProgress(`加载中断，${3}秒后自动重试 (${attempt}/${MAX_RETRIES})...`);
+          await new Promise((r) => setTimeout(r, 3000));
+        } else {
+          setLlmStatus("error");
+          setLlmProgress(`加载失败（已重试${MAX_RETRIES}次）: ${err}`);
+        }
+      }
     }
   }, [llmModelId, llmStatus]);
 
@@ -1206,9 +1242,10 @@ export default function HomePage() {
     };
 
     try {
+      spellSpeechLenRef.current = 0;
       rec.start();
       speechRef.current = rec;
-      setRecognizedText("正在监听...（按住空格）");
+      setRecognizedText(playModeRef.current === "spell_word" ? "语音输入中...（说出单词）" : "正在监听...（按住空格）");
     } catch {
       setSpeechSupported(false);
     }
@@ -1645,8 +1682,7 @@ export default function HomePage() {
       event.preventDefault();
       const canListen =
         gameState === "running" &&
-        askingRef.current &&
-        (playMode === "plane_shooter" || Boolean(targetRef.current));
+        (playMode === "spell_word" || (askingRef.current && (playMode === "plane_shooter" || Boolean(targetRef.current))));
       if (!canListen) return;
       spaceHoldRef.current = true;
       setIsHoldingSpace(true);
@@ -1671,7 +1707,9 @@ export default function HomePage() {
       spaceHoldRef.current = false;
       setIsHoldingSpace(false);
       stopSpeech();
-      if (gameState === "running" && askingRef.current) {
+      if (playMode === "spell_word" && gameState === "running") {
+        setRecognizedText("");
+      } else if (gameState === "running" && askingRef.current) {
         setRecognizedText("已停止监听（按住空格继续）");
       }
     };
@@ -2237,6 +2275,7 @@ export default function HomePage() {
                     <div className="flex items-center gap-3 text-xs text-indigo-300/60">
                       <span>Backspace 删除</span>
                       <span>Enter 确认</span>
+                      <span>按住空格 语音说出单词</span>
                     </div>
                   </div>
                 )}
