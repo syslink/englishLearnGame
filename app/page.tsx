@@ -748,8 +748,8 @@ export default function HomePage() {
     if (!target) { pickNextSpellTarget(); return; }
 
     const letters = overrideLetters || spellInputRef.current;
-    const typed = letters.join("").toLowerCase();
-    const correct = target.normalized.replace(/\s+/g, "");
+    const typed = letters.join("").toLowerCase().replace(/\s+/g, " ").trim();
+    const correct = target.normalized;
 
     if (typed === correct) {
       // Correct → explode immediately
@@ -1583,6 +1583,16 @@ export default function HomePage() {
           setSpellInput((prev) => [...prev, event.key.toLowerCase()]);
           return;
         }
+        if (event.key === " " && !event.repeat) {
+          event.preventDefault();
+          // 仅当目标是词组（含空格）时才接受空格输入
+          const tid = spellTargetIdRef.current;
+          const target = tid ? wordsRef.current.find((w) => w.id === tid) : null;
+          if (target && /\s/.test(target.normalized)) {
+            setSpellInput((prev) => (prev.length > 0 && prev[prev.length - 1] !== " " ? [...prev, " "] : prev));
+          }
+          return;
+        }
       }
 
       if (event.code === "ArrowLeft" || event.code === "ArrowRight" || event.code === "ArrowUp") {
@@ -1693,78 +1703,56 @@ export default function HomePage() {
           </button>
         </div>
       )}
-      <div className="mx-auto max-w-6xl p-4 md:p-6">
-        <section className="grid gap-4 rounded-2xl border border-indigo-300/25 bg-slate-950/55 p-4 backdrop-blur-md md:grid-cols-[1.2fr_1fr]">
+      <div className="mx-auto max-w-6xl px-4 pb-8 pt-6 md:px-6 md:pt-8">
+        {/* 顶部品牌区 */}
+        <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h2 className="mb-2 text-sm font-semibold tracking-wide text-indigo-200">
-              1. 输入词库（每行：英文=中文释义）
-            </h2>
-            <textarea
-              value={wordInput}
-              onChange={(e) => setWordInput(e.target.value)}
-              spellCheck={false}
-              className="h-40 w-full resize-y rounded-xl border border-indigo-300/35 bg-slate-950/90 p-3 text-sm text-slate-100 outline-none ring-offset-0 focus:border-emerald-400"
-            />
-            <p className="mt-2 text-xs text-indigo-100/85">
-              支持单词和词组，例如：<code>look after=照顾</code>
+            <h1 className="flex items-baseline gap-2">
+              <span className="bg-gradient-to-r from-emerald-300 via-cyan-300 to-indigo-300 bg-clip-text text-4xl font-black tracking-tight text-transparent md:text-5xl">
+                FlyWord
+              </span>
+              <span className="text-2xl font-extrabold text-indigo-100 md:text-3xl">飞词</span>
+            </h1>
+            <p className="mt-1 text-sm text-indigo-200/80">
+              开口就记住 · AI 生词 · 语音识别 · 像打飞机一样击落每个单词
             </p>
-            <div className="mt-2 flex items-center gap-2 text-xs text-indigo-100/90">
-              <span className="shrink-0">场景词库</span>
-              <select
-                onChange={(e) => {
-                  const id = Number(e.target.value);
-                  if (id) loadScenario(id);
-                }}
-                disabled={gameState === "running"}
-                defaultValue=""
-                className="flex-1 rounded-lg border border-indigo-300/35 bg-slate-900/90 px-2 py-1 text-sm text-white outline-none disabled:opacity-60"
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 ${
+              llmStatus === "ready"
+                ? "border border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
+                : llmStatus === "loading"
+                  ? "border border-amber-400/40 bg-amber-500/10 text-amber-200"
+                  : llmStatus === "error"
+                    ? "border border-rose-400/40 bg-rose-500/10 text-rose-200"
+                    : "border border-indigo-400/30 bg-indigo-500/10 text-indigo-200/80"
+            }`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${
+                llmStatus === "ready" ? "bg-emerald-400 animate-pulse"
+                : llmStatus === "loading" ? "bg-amber-400 animate-pulse"
+                : llmStatus === "error" ? "bg-rose-400"
+                : "bg-indigo-400/60"
+              }`} />
+              AI {llmStatus === "ready" ? "就绪" : llmStatus === "loading" ? "加载中" : llmStatus === "error" ? "未就绪" : "未加载"}
+            </span>
+            {llmStatus === "ready" && (
+              <button
+                type="button"
+                onClick={() => setLlmChatOpen(true)}
+                className="rounded-full border border-violet-400/40 bg-violet-500/15 px-3 py-1 text-xs font-semibold text-violet-100 transition hover:bg-violet-400/25"
               >
-                <option value="" disabled>
-                  选择一个场景快速导入词库…
-                </option>
-                {SCENARIOS.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.scene}（{s.words.length}词）
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="mt-2 flex items-center gap-2 text-xs text-indigo-100/90">
-              <label className="flex items-center gap-2">
-                <span>游戏模式</span>
-                <select
-                  value={playMode}
-                  onChange={(e) => setPlayMode(e.target.value as PlayMode)}
-                  disabled={gameState === "running"}
-                  className="rounded-lg border border-indigo-300/35 bg-slate-900/90 px-2 py-1 text-sm text-white outline-none disabled:opacity-60"
-                >
-                  <option value="voice_match">释义匹配</option>
-                  <option value="plane_shooter">飞机射击</option>
-                  <option value="spell_word">拼单词</option>
-                </select>
-              </label>
-            </div>
-            {playMode === "plane_shooter" ? (
-              <div className="mt-2 space-y-2 text-xs text-indigo-100/90">
-                <label className="inline-flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={planeDropChineseOnly}
-                    onChange={(e) => setPlaneDropChineseOnly(e.target.checked)}
-                    disabled={gameState === "running"}
-                    className="h-4 w-4 rounded border-indigo-300/40 bg-slate-900/90 accent-emerald-400 disabled:opacity-50"
-                  />
-                  <span>中文下落模式（先显示中文，说对英文后变英文并变红可射击）</span>
-                </label>
-              </div>
-            ) : null}
-            {playMode === "plane_shooter" ? (
-              <p className="mt-2 text-xs text-sky-200">
-                操作：中文下落，按住空格说英文锁定红色目标；左右方向键移动；上方向键发射。
-              </p>
-            ) : null}
-            <div className="mt-2 flex items-center gap-2 text-xs text-indigo-100/90">
-              <label htmlFor="roundSeconds">每题倒计时（秒）</label>
+                💬 跟 AI 对话
+              </button>
+            )}
+          </div>
+        </header>
+
+        {/* 模式选择卡片 */}
+        <section className="mb-6">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold tracking-wide text-indigo-200/90">选择游戏模式</h2>
+            <div className="flex items-center gap-2 text-xs text-indigo-200/70">
+              <label htmlFor="roundSeconds">倒计时</label>
               <input
                 id="roundSeconds"
                 type="number"
@@ -1779,107 +1767,203 @@ export default function HomePage() {
                     setCountdownMs(next * 1000);
                   }
                 }}
-                className="w-20 rounded-lg border border-indigo-300/35 bg-slate-900/90 px-2 py-1 text-sm text-white outline-none"
+                className="w-16 rounded-md border border-indigo-300/30 bg-slate-900/80 px-2 py-0.5 text-center text-xs text-white outline-none focus:border-emerald-400"
               />
-              <span className="text-indigo-200/80">可自由设置</span>
+              <span>秒</span>
             </div>
-            <div className="mt-3 rounded-xl border border-indigo-300/25 bg-slate-900/60 p-3">
-              <p className="mb-2 text-xs font-semibold text-indigo-100/90">
-                本地 LLM（WebLLM - 浏览器端运行，需 WebGPU）
-              </p>
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                <div ref={llmDropdownRef} className="relative">
-                  <input
-                    type="text"
-                    value={llmDropdownOpen ? llmModelFilter : (llmModelId || "加载模型列表中...")}
-                    onChange={(e) => { setLlmModelFilter(e.target.value); setLlmDropdownOpen(true); }}
-                    onFocus={() => { setLlmDropdownOpen(true); setLlmModelFilter(""); }}
-                    disabled={llmStatus === "loading" || !llmAvailableModels.length}
-                    placeholder="搜索模型..."
-                    className="w-[280px] rounded-lg border border-indigo-300/35 bg-slate-900/90 px-2 py-1 text-sm text-white placeholder-indigo-300/40 outline-none disabled:opacity-60"
-                  />
-                  {llmDropdownOpen && llmAvailableModels.length > 0 && (
-                    <div className="absolute left-0 top-full z-50 mt-1 max-h-60 w-[360px] overflow-y-auto rounded-lg border border-indigo-300/35 bg-slate-900/95 py-1 shadow-xl">
-                      {filteredLlmModels.length ? (
-                        filteredLlmModels.map((m) => (
-                          <button
-                            key={m.id}
-                            type="button"
-                            onClick={() => { setLlmModelId(m.id); setLlmDropdownOpen(false); setLlmModelFilter(""); }}
-                            className={`flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-xs transition hover:bg-indigo-500/20 ${m.id === llmModelId ? "bg-indigo-500/15 text-indigo-100" : "text-white/80"}`}
-                          >
-                            <span className="flex-1 truncate">{m.cached ? "✓ " : ""}{m.id} {m.size ? `(${m.size})` : ""}{m.cached ? " [已缓存]" : ""}</span>
-                          </button>
-                        ))
-                      ) : (
-                        <p className="px-2.5 py-2 text-xs text-indigo-300/50">无匹配模型</p>
-                      )}
-                    </div>
-                  )}
-                </div>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {[
+              { id: "voice_match" as PlayMode, icon: "🎯", name: "释义匹配", desc: "看中文说英文" },
+              { id: "plane_shooter" as PlayMode, icon: "✈️", name: "飞机射击", desc: "语音锁定+射击" },
+              { id: "spell_word" as PlayMode, icon: "⌨️", name: "拼单词", desc: "键盘拼出单词" },
+            ].map((mode) => {
+              const active = playMode === mode.id;
+              return (
+                <button
+                  key={mode.id}
+                  type="button"
+                  onClick={() => setPlayMode(mode.id)}
+                  disabled={gameState === "running"}
+                  className={`group relative overflow-hidden rounded-2xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    active
+                      ? "border-emerald-400/60 bg-gradient-to-br from-emerald-500/20 via-cyan-500/10 to-indigo-500/15 shadow-[0_0_0_1px_rgba(52,211,153,0.3)]"
+                      : "border-indigo-300/20 bg-slate-900/60 hover:border-indigo-300/40 hover:bg-slate-900/80"
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <span className="text-3xl">{mode.icon}</span>
+                    {active && (
+                      <span className="rounded-full bg-emerald-400/90 px-2 py-0.5 text-[10px] font-bold text-slate-900">当前</span>
+                    )}
+                  </div>
+                  <p className="mt-2 text-base font-bold text-white">{mode.name}</p>
+                  <p className="text-xs text-indigo-200/70">{mode.desc}</p>
+                </button>
+              );
+            })}
+          </div>
+          {playMode === "plane_shooter" && (
+            <label className="mt-3 inline-flex items-center gap-2 rounded-lg border border-indigo-300/20 bg-slate-900/50 px-3 py-1.5 text-xs text-indigo-100/90">
+              <input
+                type="checkbox"
+                checked={planeDropChineseOnly}
+                onChange={(e) => setPlaneDropChineseOnly(e.target.checked)}
+                disabled={gameState === "running"}
+                className="h-4 w-4 rounded border-indigo-300/40 bg-slate-900/90 accent-emerald-400 disabled:opacity-50"
+              />
+              <span>中文下落模式：先看中文，说对英文后才变红可射击</span>
+            </label>
+          )}
+        </section>
+
+        {/* 主操作区：词库 + 开始 */}
+        <section className="mb-6 grid gap-4 lg:grid-cols-[1.35fr_1fr]">
+          {/* 词库编辑 */}
+          <div className="rounded-2xl border border-indigo-300/25 bg-slate-950/60 p-5 backdrop-blur-md">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-semibold tracking-wide text-indigo-200/90">
+                📚 词库
+              </h2>
+              <select
+                onChange={(e) => {
+                  const id = Number(e.target.value);
+                  if (id) loadScenario(id);
+                  e.target.value = "";
+                }}
+                disabled={gameState === "running"}
+                defaultValue=""
+                className="max-w-[200px] rounded-lg border border-indigo-300/30 bg-slate-900/80 px-2 py-1 text-xs text-white outline-none disabled:opacity-60"
+              >
+                <option value="" disabled>
+                  📥 导入场景词库…
+                </option>
+                {SCENARIOS.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.scene}（{s.words.length}词）
+                  </option>
+                ))}
+              </select>
+            </div>
+            <textarea
+              value={wordInput}
+              onChange={(e) => setWordInput(e.target.value)}
+              spellCheck={false}
+              placeholder="每行一条，格式：英文=中文&#10;例如：&#10;apple=苹果&#10;look after=照顾"
+              className="h-48 w-full resize-y rounded-xl border border-indigo-300/25 bg-slate-950/80 p-3 text-sm text-slate-100 outline-none transition focus:border-emerald-400/70"
+            />
+
+            {llmStatus === "ready" && (
+              <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-300/25 bg-emerald-500/5 p-2">
+                <span className="text-lg">✨</span>
+                <input
+                  type="text"
+                  placeholder="输入主题让 AI 生成词库：旅行、面试、医院…"
+                  value={llmTopic}
+                  onChange={(e) => setLlmTopic(e.target.value)}
+                  className="flex-1 rounded-lg border border-emerald-300/20 bg-slate-950/60 px-2 py-1 text-xs text-white placeholder-emerald-200/40 outline-none focus:border-emerald-400/60"
+                />
                 <button
                   type="button"
-                  onClick={loadLlmModel}
-                  disabled={llmStatus === "loading" || !llmModelId}
-                  className="rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 px-3 py-1 text-xs font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-55"
+                  onClick={generateWordsWithLlm}
+                  disabled={llmGenerating}
+                  className="shrink-0 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 px-3 py-1 text-xs font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-55"
                 >
-                  {llmStatus === "loading" ? "加载中..." : (llmStatus === "ready" || selectedModelCached) ? "重新加载" : "加载模型"}
+                  {llmGenerating ? "生成中..." : "AI 生成"}
                 </button>
-                {llmStatus === "ready" && (
-                  <button
-                    type="button"
-                    onClick={() => setLlmChatOpen(true)}
-                    className="rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 px-3 py-1 text-xs font-semibold text-white transition hover:brightness-110"
+              </div>
+            )}
+
+            {lexiconLabels.length > 0 && (
+              <div className="mt-3">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <p className="text-[11px] text-indigo-200/70">共 {lexiconLabels.length} 词 · 点击发音</p>
+                  <select
+                    value={selectedVoiceURI}
+                    onChange={(e) => setSelectedVoiceURI(e.target.value)}
+                    className="max-w-[180px] rounded-md border border-indigo-300/25 bg-slate-900/70 px-1.5 py-0.5 text-[10px] text-white outline-none"
+                    title="选择发音人"
                   >
-                    跟AI对话
-                  </button>
+                    {ttsVoices.length ? (
+                      ttsVoices.map((voice) => (
+                        <option key={voice.voiceURI} value={voice.voiceURI}>
+                          {voice.name} ({voice.lang})
+                        </option>
+                      ))
+                    ) : (
+                      <option value="">未检测到英文发音人</option>
+                    )}
+                  </select>
+                </div>
+                <div className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto pr-1">
+                  {lexiconLabels.map((item, idx) => (
+                    <button
+                      key={`${item.en}-${item.zh}-${idx}`}
+                      type="button"
+                      onClick={() => speakText(item.en)}
+                      className="rounded-full border border-cyan-300/30 bg-cyan-500/10 px-2 py-0.5 text-[11px] text-cyan-100 transition hover:bg-cyan-400/25"
+                      title={`点击发音：${item.en}`}
+                    >
+                      {item.en}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 开始游戏 CTA */}
+          <div className="flex flex-col rounded-2xl border border-emerald-300/25 bg-gradient-to-br from-emerald-500/10 via-cyan-500/5 to-slate-950/60 p-5 backdrop-blur-md">
+            <div className="flex-1">
+              <h2 className="mb-1 text-sm font-semibold tracking-wide text-emerald-200/90">🚀 开始挑战</h2>
+              <p className="text-xs text-indigo-200/70">
+                当前模式：
+                <span className="ml-1 font-semibold text-emerald-200">
+                  {playMode === "voice_match" ? "释义匹配" : playMode === "spell_word" ? "拼单词" : "飞机射击"}
+                </span>
+              </p>
+              <p className="mt-0.5 text-xs text-indigo-200/70">
+                词条数量：<span className="font-semibold text-emerald-200">{lexiconLabels.length}</span>
+                {lexiconLabels.length < 3 && (
+                  <span className="ml-2 text-rose-300">（至少需要 3 条）</span>
                 )}
-                {llmStatus === "ready" && (
-                  <span className="text-emerald-400 text-xs">已就绪</span>
+              </p>
+              <div className="mt-3 space-y-1.5 text-[11px] text-indigo-200/80">
+                {playMode === "voice_match" && (
+                  <>
+                    <p>· 看中文，按住空格说出对应英文</p>
+                    <p>· 匹配成功自动进入下一题</p>
+                  </>
                 )}
-                {llmStatus === "error" && (
-                  <span className="text-rose-400 text-xs">加载失败</span>
+                {playMode === "plane_shooter" && (
+                  <>
+                    <p>· 按住空格说英文锁定红色目标</p>
+                    <p>· 左右方向键移动，上键发射子弹</p>
+                  </>
+                )}
+                {playMode === "spell_word" && (
+                  <>
+                    <p>· 字母顺序打乱，看中文重新拼写</p>
+                    <p>· 键盘输入字母，回车确认</p>
+                  </>
                 )}
               </div>
-              {llmStatus === "loading" && llmProgress && (
-                <p className="mt-1.5 font-mono text-xs text-amber-200/80">
-                  {llmProgress}
-                </p>
-              )}
-              {llmStatus === "ready" && (
-                <div className="mt-2 flex items-center gap-2">
-                  <input
-                    type="text"
-                    placeholder="输入主题，如：旅行、医院、面试..."
-                    value={llmTopic}
-                    onChange={(e) => setLlmTopic(e.target.value)}
-                    className="flex-1 rounded-lg border border-indigo-300/35 bg-slate-900/90 px-2 py-1 text-sm text-white placeholder-indigo-300/40 outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={generateWordsWithLlm}
-                    disabled={llmGenerating}
-                    className="rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 px-3 py-1 text-xs font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-55"
-                  >
-                    {llmGenerating ? "生成中..." : "AI 生成词库"}
-                  </button>
-                </div>
-              )}
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={openGameModalAndStart}
-                disabled={gameState === "running"}
-                className="rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-55"
-              >
-                开始游戏
-              </button>
+
+            <button
+              type="button"
+              onClick={openGameModalAndStart}
+              disabled={gameState === "running" || lexiconLabels.length < 3}
+              className="mt-4 w-full rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 px-4 py-3 text-base font-bold text-white shadow-lg shadow-emerald-500/20 transition hover:brightness-110 hover:shadow-emerald-500/40 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              开始游戏 ▶
+            </button>
+            <div className="mt-2 grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={stopGame}
                 disabled={gameState !== "running"}
-                className="rounded-xl bg-gradient-to-br from-rose-400 to-rose-600 px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-55"
+                className="rounded-lg border border-rose-300/35 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-100 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-45"
               >
                 提前结束
               </button>
@@ -1888,140 +1972,173 @@ export default function HomePage() {
                   type="button"
                   onClick={useTimeBoost}
                   disabled={gameState !== "running" || timeBoost <= 0}
-                  className="rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-55"
+                  className="rounded-lg border border-amber-300/35 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-100 transition hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   加时 +1s（{timeBoost}）
                 </button>
-              ) : null}
-            </div>
-
-            <div className="mt-3 rounded-xl border border-indigo-300/30 bg-slate-950/80 p-3">
-              <div className="mb-2 flex items-center gap-2">
-                <p className="text-xs text-indigo-100/85">词库标签（点击可发音）</p>
-                <select
-                  value={selectedVoiceURI}
-                  onChange={(e) => setSelectedVoiceURI(e.target.value)}
-                  className="max-w-[220px] rounded-lg border border-indigo-300/35 bg-slate-900/90 px-2 py-1 text-xs text-white outline-none"
-                  title="选择发音人"
-                >
-                  {ttsVoices.length ? (
-                    ttsVoices.map((voice) => (
-                      <option key={voice.voiceURI} value={voice.voiceURI}>
-                        {voice.name} ({voice.lang})
-                      </option>
-                    ))
-                  ) : (
-                    <option value="">未检测到英文发音人</option>
-                  )}
-                </select>
-              </div>
-              <div className="flex max-h-28 flex-wrap gap-2 overflow-y-auto pr-1">
-                {lexiconLabels.length ? (
-                  lexiconLabels.map((item, idx) => (
-                    <button
-                      key={`${item.en}-${item.zh}-${idx}`}
-                      type="button"
-                      onClick={() => speakText(item.en)}
-                      className="rounded-full border border-cyan-300/40 bg-cyan-500/15 px-2.5 py-1 text-xs text-cyan-100 transition hover:bg-cyan-400/25"
-                      title={`点击发音：${item.en}`}
-                    >
-                      {item.en}
-                    </button>
-                  ))
-                ) : (
-                  <p className="text-xs text-indigo-200/70">当前词库为空或格式不完整（需英文=中文）。</p>
-                )}
-              </div>
+              ) : (
+                <div />
+              )}
             </div>
           </div>
+        </section>
 
-          <div>
-            <h2 className="mb-2 text-sm font-semibold tracking-wide text-indigo-200">2. 状态</h2>
-            <div className="grid grid-cols-2 gap-2">
-              <StatCard label="总题数" value={totalCount} />
-              <StatCard label="已完成" value={doneCount} />
-              <StatCard label={playMode === "voice_match" ? "正确" : "击中"} value={playMode === "voice_match" ? correctCount : shooterHits} />
-              <StatCard label="当前连击" value={streak} />
-              <StatCard label="最高连击" value={bestStreak} />
-            </div>
-
-            <div className="mt-3 rounded-xl border border-rose-300/30 bg-slate-950/80 p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-xs text-rose-100/90">高频错词（可专项练习）</p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={loadMistakePractice}
-                    disabled={!mistakeList.length || gameState === "running"}
-                    className="rounded-lg border border-rose-300/35 px-2 py-1 text-xs text-rose-100 transition hover:bg-rose-400/20 disabled:cursor-not-allowed disabled:opacity-45"
-                  >
-                    载入错题词库
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMistakeMap({})}
-                    disabled={!mistakeList.length}
-                    className="rounded-lg border border-rose-300/35 px-2 py-1 text-xs text-rose-100 transition hover:bg-rose-400/20 disabled:cursor-not-allowed disabled:opacity-45"
-                  >
-                    清空记录
-                  </button>
-                </div>
-              </div>
-              <div className="max-h-28 overflow-y-auto pr-1">
-                {mistakeList.length ? (
-                  <div className="flex flex-wrap gap-2">
-                    {mistakeList.map((m) => (
-                      <button
-                        key={m.key}
-                        type="button"
-                        onClick={() => speakText(m.en)}
-                        className="rounded-full border border-rose-300/40 bg-rose-500/15 px-2.5 py-1 text-xs text-rose-100 transition hover:bg-rose-400/25"
-                        title={`${m.en}（错误 ${m.count} 次）`}
-                      >
-                        {m.en} ×{m.count}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-rose-100/70">还没有错词记录，开始游戏后会自动累计。</p>
+        {/* 复习区 */}
+        <section className="mb-6 grid gap-4 md:grid-cols-2">
+          <div className="rounded-2xl border border-rose-300/25 bg-slate-950/60 p-4 backdrop-blur-md">
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="flex items-center gap-1.5 text-sm font-semibold text-rose-100/90">
+                <span>🔥</span>
+                <span>高频错词</span>
+                {mistakeList.length > 0 && (
+                  <span className="rounded-full bg-rose-500/25 px-1.5 text-[10px] font-bold text-rose-100">
+                    {mistakeList.length}
+                  </span>
                 )}
-              </div>
-            </div>
-
-            <div className="mt-3 rounded-xl border border-cyan-300/30 bg-slate-950/80 p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-xs text-cyan-100/90">批次复习（同一批词单独管理）</p>
+              </h3>
+              <div className="flex gap-1.5">
                 <button
                   type="button"
-                  onClick={() => setStudyBatchMap({})}
-                  disabled={!studyBatchList.length}
-                  className="rounded-lg border border-cyan-300/35 px-2 py-1 text-xs text-cyan-100 transition hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-45"
+                  onClick={loadMistakePractice}
+                  disabled={!mistakeList.length || gameState === "running"}
+                  className="rounded-md border border-rose-300/30 px-2 py-0.5 text-[11px] text-rose-100 transition hover:bg-rose-400/20 disabled:cursor-not-allowed disabled:opacity-45"
                 >
-                  清空批次
+                  载入练习
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMistakeMap({})}
+                  disabled={!mistakeList.length}
+                  className="rounded-md border border-rose-300/30 px-2 py-0.5 text-[11px] text-rose-100 transition hover:bg-rose-400/20 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  清空
                 </button>
               </div>
-              <div className="max-h-28 overflow-y-auto pr-1">
-                {studyBatchList.length ? (
-                  <div className="flex flex-wrap gap-2">
-                    {studyBatchList.slice(0, 40).map((batch) => (
-                      <button
-                        key={batch.id}
-                        type="button"
-                        onClick={() => loadBatchPractice(batch.id)}
-                        disabled={gameState === "running"}
-                        className="rounded-full border border-cyan-300/40 bg-cyan-500/15 px-2.5 py-1 text-xs text-cyan-100 transition hover:bg-cyan-400/25 disabled:cursor-not-allowed disabled:opacity-45"
-                        title={`词数${batch.wordCount} 练习${batch.playCount}次 ✓${batch.correctCount} ✗${batch.wrongCount}\n${batch.words.join("\n")}`}
-                      >
-                        {new Date(batch.lastPlayedAt).toLocaleDateString("zh-CN")} · {batch.wordCount}词 · 第{batch.playCount}次
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-cyan-100/70">暂无批次记录，开始游戏后会按词库自动记录批次。</p>
-                )}
-              </div>
+            </div>
+            <div className="max-h-28 overflow-y-auto pr-1">
+              {mistakeList.length ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {mistakeList.map((m) => (
+                    <button
+                      key={m.key}
+                      type="button"
+                      onClick={() => speakText(m.en)}
+                      className="rounded-full border border-rose-300/35 bg-rose-500/15 px-2 py-0.5 text-[11px] text-rose-100 transition hover:bg-rose-400/25"
+                      title={`${m.en}（错误 ${m.count} 次）`}
+                    >
+                      {m.en} ×{m.count}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[11px] text-rose-100/60">还没有错词记录，开始游戏后会自动累计。</p>
+              )}
             </div>
           </div>
+
+          <div className="rounded-2xl border border-cyan-300/25 bg-slate-950/60 p-4 backdrop-blur-md">
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="flex items-center gap-1.5 text-sm font-semibold text-cyan-100/90">
+                <span>📅</span>
+                <span>批次复习</span>
+                {studyBatchList.length > 0 && (
+                  <span className="rounded-full bg-cyan-500/25 px-1.5 text-[10px] font-bold text-cyan-100">
+                    {studyBatchList.length}
+                  </span>
+                )}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setStudyBatchMap({})}
+                disabled={!studyBatchList.length}
+                className="rounded-md border border-cyan-300/30 px-2 py-0.5 text-[11px] text-cyan-100 transition hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                清空
+              </button>
+            </div>
+            <div className="max-h-28 overflow-y-auto pr-1">
+              {studyBatchList.length ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {studyBatchList.slice(0, 40).map((batch) => (
+                    <button
+                      key={batch.id}
+                      type="button"
+                      onClick={() => loadBatchPractice(batch.id)}
+                      disabled={gameState === "running"}
+                      className="rounded-full border border-cyan-300/35 bg-cyan-500/15 px-2 py-0.5 text-[11px] text-cyan-100 transition hover:bg-cyan-400/25 disabled:cursor-not-allowed disabled:opacity-45"
+                      title={`词数${batch.wordCount} 练习${batch.playCount}次 ✓${batch.correctCount} ✗${batch.wrongCount}\n${batch.words.join("\n")}`}
+                    >
+                      {new Date(batch.lastPlayedAt).toLocaleDateString("zh-CN")} · {batch.wordCount}词 · 第{batch.playCount}次
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[11px] text-cyan-100/60">暂无批次记录，开始游戏后会按词库自动记录。</p>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* LLM 设置折叠区 */}
+        <section className="rounded-2xl border border-indigo-300/15 bg-slate-950/40 p-4 backdrop-blur-md">
+          <details className="group">
+            <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-indigo-200/90">
+              <span className="flex items-center gap-2">
+                <span>⚙️</span>
+                <span>本地大模型设置</span>
+                <span className="text-[10px] font-normal text-indigo-300/60">WebLLM · 需 WebGPU</span>
+              </span>
+              <span className="text-indigo-300/60 transition group-open:rotate-180">▾</span>
+            </summary>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+              <div ref={llmDropdownRef} className="relative">
+                <input
+                  type="text"
+                  value={llmDropdownOpen ? llmModelFilter : (llmModelId || "加载模型列表中...")}
+                  onChange={(e) => { setLlmModelFilter(e.target.value); setLlmDropdownOpen(true); }}
+                  onFocus={() => { setLlmDropdownOpen(true); setLlmModelFilter(""); }}
+                  disabled={llmStatus === "loading" || !llmAvailableModels.length}
+                  placeholder="搜索模型..."
+                  className="w-[280px] rounded-lg border border-indigo-300/30 bg-slate-900/80 px-2 py-1 text-sm text-white placeholder-indigo-300/40 outline-none disabled:opacity-60"
+                />
+                {llmDropdownOpen && llmAvailableModels.length > 0 && (
+                  <div className="absolute left-0 top-full z-50 mt-1 max-h-60 w-[360px] overflow-y-auto rounded-lg border border-indigo-300/30 bg-slate-900/95 py-1 shadow-xl">
+                    {filteredLlmModels.length ? (
+                      filteredLlmModels.map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => { setLlmModelId(m.id); setLlmDropdownOpen(false); setLlmModelFilter(""); }}
+                          className={`flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-xs transition hover:bg-indigo-500/20 ${m.id === llmModelId ? "bg-indigo-500/15 text-indigo-100" : "text-white/80"}`}
+                        >
+                          <span className="flex-1 truncate">{m.cached ? "✓ " : ""}{m.id} {m.size ? `(${m.size})` : ""}{m.cached ? " [已缓存]" : ""}</span>
+                        </button>
+                      ))
+                    ) : (
+                      <p className="px-2.5 py-2 text-xs text-indigo-300/50">无匹配模型</p>
+                    )}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={loadLlmModel}
+                disabled={llmStatus === "loading" || !llmModelId}
+                className="rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 px-3 py-1 text-xs font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-55"
+              >
+                {llmStatus === "loading" ? "加载中..." : (llmStatus === "ready" || selectedModelCached) ? "重新加载" : "加载模型"}
+              </button>
+              {llmStatus === "ready" && (
+                <span className="rounded-full border border-emerald-400/40 bg-emerald-500/15 px-2 py-0.5 text-[11px] text-emerald-200">已就绪</span>
+              )}
+              {llmStatus === "error" && (
+                <span className="rounded-full border border-rose-400/40 bg-rose-500/15 px-2 py-0.5 text-[11px] text-rose-200">加载失败</span>
+              )}
+            </div>
+            {llmStatus === "loading" && llmProgress && (
+              <p className="mt-2 font-mono text-xs text-amber-200/80">{llmProgress}</p>
+            )}
+          </details>
         </section>
 
         {isGameModalOpen ? (
@@ -2043,9 +2160,11 @@ export default function HomePage() {
                   </p>
                 </div>
                 {playMode === "voice_match" ? (
-                  <p className="max-w-[48vw] justify-self-center truncate text-center text-lg font-bold text-emerald-100">
-                    {currentMeaning || "准备开始..."}
-                  </p>
+                  <div className="max-w-[56vw] justify-self-center rounded-2xl border-2 border-emerald-300/60 bg-gradient-to-br from-emerald-500/25 via-emerald-400/15 to-teal-500/20 px-6 py-2.5 shadow-lg shadow-emerald-500/20 backdrop-blur-sm">
+                    <p className="truncate text-center text-3xl font-extrabold tracking-wide text-emerald-50 drop-shadow-[0_2px_8px_rgba(16,185,129,0.6)]">
+                      {currentMeaning || "准备开始..."}
+                    </p>
+                  </div>
                 ) : (
                   <div />
                 )}
@@ -2255,14 +2374,24 @@ export default function HomePage() {
                       {spellInput.length === 0 ? (
                         <span className="text-sm text-indigo-300/50">在键盘上输入字母...</span>
                       ) : (
-                        spellInput.map((ch, i) => (
-                          <span
-                            key={i}
-                            className="inline-flex h-9 w-8 items-center justify-center rounded-lg border-2 border-indigo-400/60 bg-indigo-950/80 text-lg font-bold text-white shadow"
-                          >
-                            {ch}
-                          </span>
-                        ))
+                        spellInput.map((ch, i) =>
+                          ch === " " ? (
+                            <span
+                              key={i}
+                              className="inline-flex h-9 w-5 items-center justify-center text-indigo-300/50"
+                              aria-label="space"
+                            >
+                              ␣
+                            </span>
+                          ) : (
+                            <span
+                              key={i}
+                              className="inline-flex h-9 w-8 items-center justify-center rounded-lg border-2 border-indigo-400/60 bg-indigo-950/80 text-lg font-bold text-white shadow"
+                            >
+                              {ch}
+                            </span>
+                          )
+                        )
                       )}
                       <span className="inline-flex h-9 w-8 items-center justify-center rounded-lg border-2 border-dashed border-indigo-400/30 text-indigo-400/40">
                         _
@@ -2271,7 +2400,7 @@ export default function HomePage() {
                     <div className="flex items-center gap-3 text-xs text-indigo-300/60">
                       <span>Backspace 删除</span>
                       <span>Enter 确认</span>
-                      <span>按住空格 语音说出单词</span>
+                      <span>词组用空格分隔</span>
                     </div>
                   </div>
                 )}
@@ -2280,7 +2409,7 @@ export default function HomePage() {
                   <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/55 p-4 text-center">
                     <div className="max-w-xl rounded-2xl border border-indigo-200/35 bg-slate-950/95 p-6">
                       <h1 className="text-3xl font-extrabold">
-                        {gameState === "ended" ? "游戏结束" : "英语语音打词"}
+                        {gameState === "ended" ? "游戏结束" : "FlyWord 飞词"}
                       </h1>
                       {gameState === "ended" ? (
                         <>
@@ -2350,11 +2479,3 @@ export default function HomePage() {
   );
 }
 
-function StatCard({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div className="rounded-xl border border-indigo-300/25 bg-slate-950/85 p-3">
-      <p className="text-xs text-indigo-100/80">{label}</p>
-      <p className="mt-1 text-2xl font-extrabold text-white">{value}</p>
-    </div>
-  );
-}
