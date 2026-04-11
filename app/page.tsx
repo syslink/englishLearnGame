@@ -2124,9 +2124,9 @@ export default function HomePage() {
                   );
                 })}
 
-                {/* 飞机射击模式：触摸设备右下角控制按钮 */}
+                {/* 飞机射击模式：触摸设备左下角左右移动键 */}
                 {playMode === "plane_shooter" && gameState === "running" && isTouchDevice && (
-                  <div className="absolute bottom-4 right-4 z-[20] flex select-none items-end gap-3">
+                  <div className="absolute bottom-4 left-4 z-[20] flex select-none items-end gap-3">
                     <button
                       type="button"
                       aria-label="左移"
@@ -2156,17 +2156,6 @@ export default function HomePage() {
                     </button>
                     <button
                       type="button"
-                      aria-label="发射"
-                      onPointerDown={(e) => {
-                        e.preventDefault();
-                        firePlaneBullet();
-                      }}
-                      className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-amber-300/70 bg-amber-500/30 text-4xl text-amber-100 shadow-lg backdrop-blur-sm transition active:scale-95 active:bg-amber-500/60"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
                       aria-label="右移"
                       onPointerDown={(e) => {
                         e.preventDefault();
@@ -2191,6 +2180,23 @@ export default function HomePage() {
                       className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-indigo-300/60 bg-slate-900/80 text-3xl text-indigo-100 shadow-lg backdrop-blur-sm transition active:scale-95 active:bg-indigo-600/60"
                     >
                       →
+                    </button>
+                  </div>
+                )}
+
+                {/* 飞机射击模式：触摸设备右下角发射键 */}
+                {playMode === "plane_shooter" && gameState === "running" && isTouchDevice && (
+                  <div className="absolute bottom-4 right-4 z-[20] select-none">
+                    <button
+                      type="button"
+                      aria-label="发射"
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        firePlaneBullet();
+                      }}
+                      className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-amber-300/70 bg-amber-500/30 text-4xl text-amber-100 shadow-lg backdrop-blur-sm transition active:scale-95 active:bg-amber-500/60"
+                    >
+                      ↑
                     </button>
                   </div>
                 )}
