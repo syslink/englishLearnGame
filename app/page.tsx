@@ -116,77 +116,7 @@ turn on=打开
 make up=编造
 look after=照顾`;
 
-type Difficulty = "easy" | "medium" | "hard";
 type LexiconItem = { en: string; zh: string };
-
-const WORD_BANK: Record<Difficulty, LexiconItem[]> = {
-  easy: [
-    { en: "apple", zh: "苹果" },
-    { en: "banana", zh: "香蕉" },
-    { en: "book", zh: "书" },
-    { en: "water", zh: "水" },
-    { en: "school", zh: "学校" },
-    { en: "family", zh: "家庭" },
-    { en: "friend", zh: "朋友" },
-    { en: "happy", zh: "开心的" },
-    { en: "small", zh: "小的" },
-    { en: "big", zh: "大的" },
-    { en: "open", zh: "打开" },
-    { en: "close", zh: "关闭" },
-    { en: "morning", zh: "早上" },
-    { en: "night", zh: "夜晚" },
-    { en: "yellow", zh: "黄色" },
-    { en: "teacher", zh: "老师" },
-    { en: "student", zh: "学生" },
-    { en: "window", zh: "窗户" },
-    { en: "music", zh: "音乐" },
-    { en: "breakfast", zh: "早餐" },
-  ],
-  medium: [
-    { en: "take off", zh: "脱下；起飞" },
-    { en: "look after", zh: "照顾" },
-    { en: "turn on", zh: "打开" },
-    { en: "turn off", zh: "关闭" },
-    { en: "make sure", zh: "确保" },
-    { en: "for example", zh: "例如" },
-    { en: "arrive at", zh: "到达" },
-    { en: "be interested in", zh: "对...感兴趣" },
-    { en: "in front of", zh: "在...前面" },
-    { en: "as soon as", zh: "一...就..." },
-    { en: "write down", zh: "记下" },
-    { en: "grow up", zh: "长大" },
-    { en: "on time", zh: "准时" },
-    { en: "at least", zh: "至少" },
-    { en: "in fact", zh: "事实上" },
-    { en: "in the end", zh: "最后" },
-    { en: "take care of", zh: "照顾" },
-    { en: "find out", zh: "查明" },
-    { en: "give up", zh: "放弃" },
-    { en: "make up", zh: "编造；化妆" },
-  ],
-  hard: [
-    { en: "inevitable", zh: "不可避免的" },
-    { en: "sustainable", zh: "可持续的" },
-    { en: "nevertheless", zh: "然而；不过" },
-    { en: "approximately", zh: "大约" },
-    { en: "consequence", zh: "结果；后果" },
-    { en: "prioritize", zh: "优先处理" },
-    { en: "collaboration", zh: "协作" },
-    { en: "misunderstanding", zh: "误解" },
-    { en: "significantly", zh: "显著地" },
-    { en: "interpretation", zh: "解释；理解" },
-    { en: "be capable of", zh: "能够..." },
-    { en: "in terms of", zh: "就...而言" },
-    { en: "with regard to", zh: "关于..." },
-    { en: "by no means", zh: "绝不" },
-    { en: "take into account", zh: "把...考虑在内" },
-    { en: "it is worth noting that", zh: "值得注意的是" },
-    { en: "from my perspective", zh: "从我的角度看" },
-    { en: "play a crucial role in", zh: "在...中起关键作用" },
-    { en: "there is no denying that", zh: "不可否认的是" },
-    { en: "in the long run", zh: "从长远来看" },
-  ],
-};
 
 const ROUND_MS = 30000;
 const STUDY_HISTORY_STORAGE_KEY = "english_voice_game_study_history_v1";
@@ -317,8 +247,6 @@ export default function HomePage() {
   const [roundSeconds, setRoundSeconds] = useState(30);
   const [fallHeightPx] = useState(600);
   const [planeDropChineseOnly, setPlaneDropChineseOnly] = useState(false);
-  const [difficulty, setDifficulty] = useState<Difficulty>("easy");
-  const [generateCount, setGenerateCount] = useState(8);
   const [totalCount, setTotalCount] = useState(0);
   const [doneCount, setDoneCount] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
@@ -338,6 +266,7 @@ export default function HomePage() {
   const [shooterHits, setShooterHits] = useState(0);
   const [isGameModalOpen, setIsGameModalOpen] = useState(false);
   const [startAfterOpen, setStartAfterOpen] = useState(false);
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
   // ---- WebLLM 本地大模型 ----
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [llmEngine, setLlmEngine] = useState<any>(null);
@@ -379,18 +308,9 @@ export default function HomePage() {
   const askingRef = useRef(false);
   const targetRef = useRef<string | null>(null);
   const spaceHoldRef = useRef(false);
+  const autoListenRef = useRef(false);
   const [, setIsHoldingSpace] = useState(false);
   const spellTargetIdRef = useRef<string | null>(null);
-  const spellSpeechLenRef = useRef(0);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const llmEngineRef = useRef<any>(null);
-  const llmParsingRef = useRef(false);
-
-  // Keep llmEngineRef in sync
-  useEffect(() => {
-    llmEngineRef.current = llmEngine;
-  }, [llmEngine]);
-
   const currentMeaning = useMemo(() => {
     if (!targetId) return gameState === "running" ? "准备下一题..." : "点击开始游戏";
     const target = words.find((w) => w.id === targetId);
@@ -427,6 +347,13 @@ export default function HomePage() {
   useEffect(() => {
     fallHeightRef.current = fallHeightPx;
   }, [fallHeightPx]);
+
+  // 触摸设备检测（平板、手机）
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hasTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+    setIsTouchDevice(hasTouch);
+  }, []);
 
   // 加载 WebLLM 可用模型列表
   useEffect(() => {
@@ -783,7 +710,7 @@ export default function HomePage() {
       setSpellTargetId(null);
       spellTargetIdRef.current = null;
       setSpellInput([]);
-      spellSpeechLenRef.current = 0;
+
       return;
     }
     // Pick the one with highest y (closest to falling out)
@@ -791,7 +718,6 @@ export default function HomePage() {
     setSpellTargetId(next.id);
     spellTargetIdRef.current = next.id;
     setSpellInput([]);
-    spellSpeechLenRef.current = 0;
   }, []);
 
   // ---- 拼单词模式：确认拼写（可接受外部传入的字母，供语音回调使用） ----
@@ -987,71 +913,6 @@ export default function HomePage() {
       const liveWords = wordsRef.current;
       const candidates = liveWords.filter((w) => w.status === "live");
       if (!candidates.length) return;
-
-      // 拼单词模式：将语音文本交给 LLM 分析字母，若无 LLM 则回退到直接提取
-      if (playMode === "spell_word") {
-        const engine = llmEngineRef.current;
-        if (engine && !llmParsingRef.current) {
-          llmParsingRef.current = true;
-          setRecognizedText(`语音: "${raw}" — LLM 分析中...`);
-          (async () => {
-            try {
-              const resp = await engine.chat.completions.create({
-                messages: [
-                  {
-                    role: "system",
-                    content:
-                      "You are a letter extraction assistant. The user is spelling out an English word by saying letters one by one via voice recognition. "
-                      + "Analyze the speech-to-text result and extract the individual English letters the user intended to say, in order. "
-                      + "Common patterns: 'ay' or 'a' = A, 'bee' or 'be' = B, 'see' or 'sea' = C, 'dee' = D, 'ee' = E, 'ef' or 'eff' = F, "
-                      + "'gee' or 'ji' = G, 'aitch' or 'H' = H, 'eye' or 'I' = I, 'jay' = J, 'kay' = K, 'el' or 'ell' = L, 'em' = M, "
-                      + "'en' = N, 'oh' or 'o' = O, 'pee' or 'P' = P, 'queue' or 'cue' = Q, 'are' or 'ar' = R, 'es' or 'ess' = S, "
-                      + "'tee' or 'T' = T, 'you' or 'u' = U, 'vee' = V, 'double you' or 'double u' = W, 'ex' = X, 'why' or 'Y' = Y, 'zee' or 'zed' = Z. "
-                      + "Output ONLY the uppercase letters with no spaces, punctuation, or explanation. Example: if input is 'ay bee see', output 'ABC'.",
-                  },
-                  { role: "user", content: raw },
-                ],
-                temperature: 0,
-                max_tokens: 50,
-              });
-              const result = resp.choices?.[0]?.message?.content?.trim() || "";
-              const letters = result.replace(/[^a-zA-Z]/g, "").toLowerCase().split("").filter(Boolean);
-              if (letters.length > 0) {
-                const newLetters = letters.slice(spellSpeechLenRef.current);
-                if (newLetters.length > 0) {
-                  spellSpeechLenRef.current = letters.length;
-                  setSpellInput((prev) => [...prev, ...newLetters]);
-                  setRecognizedText(`语音: "${raw}" → LLM: ${letters.join("").toUpperCase()}`);
-                }
-              } else {
-                setRecognizedText(`语音: "${raw}" — LLM 未识别到字母`);
-              }
-            } catch (err) {
-              console.error("LLM spell parse error:", err);
-              // Fallback: extract letters directly
-              const allLetters = normalized.replace(/[^a-z]/g, "").split("").filter(Boolean);
-              const newLetters = allLetters.slice(spellSpeechLenRef.current);
-              if (newLetters.length > 0) {
-                spellSpeechLenRef.current = allLetters.length;
-                setSpellInput((prev) => [...prev, ...newLetters]);
-                setRecognizedText(`语音: ${allLetters.join("").toUpperCase()}（LLM不可用，直接提取）`);
-              }
-            } finally {
-              llmParsingRef.current = false;
-            }
-          })();
-        } else if (!engine) {
-          // No LLM available, fallback to direct extraction
-          const allLetters = normalized.replace(/[^a-z]/g, "").split("").filter(Boolean);
-          const newLetters = allLetters.slice(spellSpeechLenRef.current);
-          if (newLetters.length > 0) {
-            spellSpeechLenRef.current = allLetters.length;
-            setSpellInput((prev) => [...prev, ...newLetters]);
-            setRecognizedText(`语音: ${allLetters.join("").toUpperCase()}`);
-          }
-        }
-        return;
-      }
 
       if (playMode === "plane_shooter") {
         let bestShooter: { word: WordItem; score: number } | null = null;
@@ -1293,7 +1154,11 @@ export default function HomePage() {
     };
 
     rec.onend = () => {
-      if (gameState === "running" && askingRef.current && spaceHoldRef.current) {
+      if (
+        gameState === "running" &&
+        askingRef.current &&
+        (spaceHoldRef.current || autoListenRef.current)
+      ) {
         try {
           rec.start();
         } catch {
@@ -1303,10 +1168,9 @@ export default function HomePage() {
     };
 
     try {
-      spellSpeechLenRef.current = 0;
       rec.start();
       speechRef.current = rec;
-      setRecognizedText(playModeRef.current === "spell_word" ? "语音输入中...（说出单词）" : "正在监听...（按住空格）");
+      setRecognizedText(autoListenRef.current ? "正在监听中..." : "正在监听...（按住空格）");
     } catch {
       setSpeechSupported(false);
     }
@@ -1320,6 +1184,7 @@ export default function HomePage() {
     planeTargetIdRef.current = null;
     askingRef.current = false;
     spaceHoldRef.current = false;
+    autoListenRef.current = false;
     planeMoveDirRef.current = 0;
     leftPressedRef.current = false;
     rightPressedRef.current = false;
@@ -1344,31 +1209,6 @@ export default function HomePage() {
     setTimeBoost((v) => Math.max(0, v - 1));
     setFeedbackText("加时成功：本题剩余时间 +1 秒");
   }, [playMode, gameState, timeBoost]);
-
-  const generateByDifficulty = useCallback(() => {
-    const bank = WORD_BANK[difficulty];
-    if (!bank.length) return;
-
-    const maxAllowed = bank.length;
-    const safeCount = Math.max(3, Math.min(maxAllowed, Math.floor(generateCount)));
-    if (safeCount !== generateCount) {
-      setGenerateCount(safeCount);
-    }
-
-    const shuffled = [...bank];
-    for (let i = shuffled.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-
-    const picked = shuffled
-      .slice(0, safeCount)
-      .map((item) => `${item.en}=${item.zh}`)
-      .join("\n");
-
-    setWordInput(picked);
-    setFeedbackText(`已生成 ${safeCount} 条${difficulty === "easy" ? "初级" : difficulty === "medium" ? "中级" : "高级"}词条`);
-  }, [difficulty, generateCount]);
 
   const loadScenario = useCallback((scenarioId: number) => {
     const scenario = SCENARIOS.find((s) => s.id === scenarioId);
@@ -1625,13 +1465,19 @@ export default function HomePage() {
       askingRef.current = true;
       targetRef.current = null;
       setTargetId(null);
-      setRecognizedText("按住空格开始监听...");
+      setRecognizedText(isTouchDevice ? "正在自动监听..." : "按住空格开始监听...");
       setCountdownMs(0);
+    }
+
+    // 触摸设备：带语音识别的游戏模式自动开启语音识别
+    if (isTouchDevice && (playMode === "voice_match" || playMode === "plane_shooter")) {
+      autoListenRef.current = true;
+      startSpeech();
     }
 
     clearRaf();
     rafRef.current = requestAnimationFrame(gameLoop);
-  }, [wordInput, playMode, fallHeightPx, addSeenHistoryBatch, registerStudyBatch, nextRound, clearRaf, gameLoop, roundSeconds, planeDropChineseOnly, pickNextSpellTarget]);
+  }, [wordInput, playMode, fallHeightPx, addSeenHistoryBatch, registerStudyBatch, nextRound, clearRaf, gameLoop, roundSeconds, planeDropChineseOnly, pickNextSpellTarget, isTouchDevice, startSpeech]);
 
   const stopGame = useCallback(() => {
     endGame();
@@ -1743,7 +1589,7 @@ export default function HomePage() {
       event.preventDefault();
       const canListen =
         gameState === "running" &&
-        (playMode === "spell_word" || (askingRef.current && (playMode === "plane_shooter" || Boolean(targetRef.current))));
+        (askingRef.current && (playMode === "plane_shooter" || Boolean(targetRef.current)));
       if (!canListen) return;
       spaceHoldRef.current = true;
       setIsHoldingSpace(true);
@@ -1768,9 +1614,7 @@ export default function HomePage() {
       spaceHoldRef.current = false;
       setIsHoldingSpace(false);
       stopSpeech();
-      if (playMode === "spell_word" && gameState === "running") {
-        setRecognizedText("");
-      } else if (gameState === "running" && askingRef.current) {
+      if (gameState === "running" && askingRef.current) {
         setRecognizedText("已停止监听（按住空格继续）");
       }
     };
@@ -1838,9 +1682,9 @@ export default function HomePage() {
                 ))}
               </select>
             </div>
-            <div className="mt-2 grid grid-cols-1 gap-2 text-xs text-indigo-100/90 md:grid-cols-[1fr_1fr_auto]">
+            <div className="mt-2 flex items-center gap-2 text-xs text-indigo-100/90">
               <label className="flex items-center gap-2">
-                <span>模式</span>
+                <span>游戏模式</span>
                 <select
                   value={playMode}
                   onChange={(e) => setPlayMode(e.target.value as PlayMode)}
@@ -1852,43 +1696,6 @@ export default function HomePage() {
                   <option value="spell_word">拼单词</option>
                 </select>
               </label>
-              <label className="flex items-center gap-2">
-                <span>难度</span>
-                <select
-                  value={difficulty}
-                  onChange={(e) => setDifficulty(e.target.value as Difficulty)}
-                  className="rounded-lg border border-indigo-300/35 bg-slate-900/90 px-2 py-1 text-sm text-white outline-none"
-                >
-                  <option value="easy">初级</option>
-                  <option value="medium">中级</option>
-                  <option value="hard">高级</option>
-                </select>
-              </label>
-              <label className="flex items-center gap-2">
-                <span>数量</span>
-                <input
-                  type="number"
-                  min={3}
-                  max={WORD_BANK[difficulty].length}
-                  value={generateCount}
-                  onChange={(e) => {
-                    const value = Number(e.target.value);
-                    if (!Number.isFinite(value)) return;
-                    const next = Math.max(3, Math.min(WORD_BANK[difficulty].length, Math.floor(value)));
-                    setGenerateCount(next);
-                  }}
-                  className="w-24 rounded-lg border border-indigo-300/35 bg-slate-900/90 px-2 py-1 text-sm text-white outline-none"
-                />
-                <span className="text-indigo-200/80">最多 {WORD_BANK[difficulty].length}</span>
-              </label>
-              <button
-                type="button"
-                onClick={generateByDifficulty}
-                disabled={gameState === "running"}
-                className="rounded-xl bg-gradient-to-br from-cyan-400 to-sky-600 px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-55"
-              >
-                随机生成词库
-              </button>
             </div>
             {playMode === "plane_shooter" ? (
               <div className="mt-2 space-y-2 text-xs text-indigo-100/90">
@@ -2171,8 +1978,8 @@ export default function HomePage() {
         </section>
 
         {isGameModalOpen ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-3 md:p-6">
-            <div className={`relative flex w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-indigo-200/35 bg-slate-950/95 shadow-2xl ${playMode === "spell_word" ? "h-[70vh]" : "h-[88vh]"}`}>
+          <div className="fixed inset-0 z-50 flex items-stretch justify-stretch bg-slate-950/75">
+            <div className="relative flex h-full w-full flex-col overflow-hidden border border-indigo-200/35 bg-slate-950/95 shadow-2xl">
               <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-b border-indigo-300/30 bg-slate-950/95 px-4 py-3">
                 <div className="justify-self-start">
                   <p className="text-sm font-semibold text-indigo-100">
@@ -2180,7 +1987,11 @@ export default function HomePage() {
                   </p>
                   <p className="text-xs text-indigo-200/80">
                     {gameState === "running"
-                      ? playMode === "spell_word" ? "用键盘拼出正确单词，按回车确认" : "游戏进行中（按住空格可语音识别）"
+                      ? playMode === "spell_word"
+                        ? "用键盘拼出正确单词，按回车确认"
+                        : isTouchDevice
+                          ? "游戏进行中（自动语音识别）"
+                          : "游戏进行中（按住空格可语音识别）"
                       : "可开始新一局或查看本局成绩"}
                   </p>
                 </div>
@@ -2312,6 +2123,77 @@ export default function HomePage() {
                     </div>
                   );
                 })}
+
+                {/* 飞机射击模式：触摸设备右下角控制按钮 */}
+                {playMode === "plane_shooter" && gameState === "running" && isTouchDevice && (
+                  <div className="absolute bottom-4 right-4 z-[20] flex select-none items-end gap-3">
+                    <button
+                      type="button"
+                      aria-label="左移"
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        leftPressedRef.current = true;
+                        planeMoveDirRef.current = rightPressedRef.current ? 0 : -1;
+                      }}
+                      onPointerUp={(e) => {
+                        e.preventDefault();
+                        leftPressedRef.current = false;
+                        planeMoveDirRef.current = rightPressedRef.current ? 1 : 0;
+                      }}
+                      onPointerCancel={() => {
+                        leftPressedRef.current = false;
+                        planeMoveDirRef.current = rightPressedRef.current ? 1 : 0;
+                      }}
+                      onPointerLeave={() => {
+                        if (leftPressedRef.current) {
+                          leftPressedRef.current = false;
+                          planeMoveDirRef.current = rightPressedRef.current ? 1 : 0;
+                        }
+                      }}
+                      className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-indigo-300/60 bg-slate-900/80 text-3xl text-indigo-100 shadow-lg backdrop-blur-sm transition active:scale-95 active:bg-indigo-600/60"
+                    >
+                      ←
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="发射"
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        firePlaneBullet();
+                      }}
+                      className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-amber-300/70 bg-amber-500/30 text-4xl text-amber-100 shadow-lg backdrop-blur-sm transition active:scale-95 active:bg-amber-500/60"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="右移"
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        rightPressedRef.current = true;
+                        planeMoveDirRef.current = leftPressedRef.current ? 0 : 1;
+                      }}
+                      onPointerUp={(e) => {
+                        e.preventDefault();
+                        rightPressedRef.current = false;
+                        planeMoveDirRef.current = leftPressedRef.current ? -1 : 0;
+                      }}
+                      onPointerCancel={() => {
+                        rightPressedRef.current = false;
+                        planeMoveDirRef.current = leftPressedRef.current ? -1 : 0;
+                      }}
+                      onPointerLeave={() => {
+                        if (rightPressedRef.current) {
+                          rightPressedRef.current = false;
+                          planeMoveDirRef.current = leftPressedRef.current ? -1 : 0;
+                        }
+                      }}
+                      className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-indigo-300/60 bg-slate-900/80 text-3xl text-indigo-100 shadow-lg backdrop-blur-sm transition active:scale-95 active:bg-indigo-600/60"
+                    >
+                      →
+                    </button>
+                  </div>
+                )}
 
                 {/* 拼单词模式：底部输入显示区 */}
                 {playMode === "spell_word" && gameState === "running" && (
