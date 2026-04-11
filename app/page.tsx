@@ -267,6 +267,7 @@ export default function HomePage() {
   const [isGameModalOpen, setIsGameModalOpen] = useState(false);
   const [startAfterOpen, setStartAfterOpen] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const [showBrowserWarning, setShowBrowserWarning] = useState(false);
   // ---- WebLLM 本地大模型 ----
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [llmEngine, setLlmEngine] = useState<any>(null);
@@ -353,6 +354,25 @@ export default function HomePage() {
     if (typeof window === "undefined") return;
     const hasTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
     setIsTouchDevice(hasTouch);
+  }, []);
+
+  // 浏览器类型检测：非 Chrome 提醒用户切换
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const ua = navigator.userAgent;
+    const vendor = navigator.vendor || "";
+    // 严格判定 Chrome：排除 Edge / Opera / Brave / Samsung / Firefox / Safari 等
+    const isChrome =
+      /Chrome\//.test(ua) &&
+      /Google Inc/.test(vendor) &&
+      !/Edg\//.test(ua) &&
+      !/OPR\//.test(ua) &&
+      !/Opera/.test(ua) &&
+      !/SamsungBrowser/.test(ua) &&
+      !/Brave/.test(ua);
+    if (!isChrome) {
+      setShowBrowserWarning(true);
+    }
   }, []);
 
   // 加载 WebLLM 可用模型列表
@@ -1646,6 +1666,33 @@ export default function HomePage() {
 
   return (
     <main className="game-bg min-h-screen text-slate-100">
+      {showBrowserWarning && (
+        <div className="sticky top-0 z-[100] flex items-center justify-between gap-3 border-b border-amber-400/40 bg-amber-500/15 px-4 py-2.5 backdrop-blur-md">
+          <div className="flex items-center gap-2 text-sm text-amber-100">
+            <span className="text-lg">⚠️</span>
+            <span>
+              为获得最佳体验（语音识别、本地大模型），建议使用
+              <a
+                href="https://www.google.com/chrome/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mx-1 font-semibold underline decoration-amber-300 underline-offset-2 hover:text-white"
+              >
+                Google Chrome
+              </a>
+              浏览器访问本页面。
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowBrowserWarning(false)}
+            className="rounded px-2 py-0.5 text-sm text-amber-100/80 transition hover:bg-amber-400/20 hover:text-white"
+            aria-label="关闭提示"
+          >
+            ×
+          </button>
+        </div>
+      )}
       <div className="mx-auto max-w-6xl p-4 md:p-6">
         <section className="grid gap-4 rounded-2xl border border-indigo-300/25 bg-slate-950/55 p-4 backdrop-blur-md md:grid-cols-[1.2fr_1fr]">
           <div>
