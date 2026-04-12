@@ -832,10 +832,10 @@ export default function HomePage() {
       const durationMs = roundSeconds * 1000;
       roundDurationRef.current = durationMs;
       setCountdownMs(durationMs);
-      setRecognizedText(nextId ? "按住空格开始监听..." : "");
+      setRecognizedText(nextId ? "正在监听中..." : "");
 
       if (nextId) {
-        setFeedbackText("按住空格说英文，松开停止监听");
+        setFeedbackText("请说出对应的英文单词");
       } else {
         setGameState("ended");
         setFeedbackText("本局结束，看看你的连击记录吧");
@@ -856,7 +856,10 @@ export default function HomePage() {
       spaceHoldRef.current = false;
       setIsHoldingSpace(false);
       setTargetId(null);
-      stopSpeech();
+      // voice_match 模式不停止语音，保持持续监听
+      if (playModeRef.current !== "voice_match") {
+        stopSpeech();
+      }
 
       setWords((prev) => {
         const updated: WordItem[] = prev.map((w) => {
@@ -1176,7 +1179,7 @@ export default function HomePage() {
     rec.onend = () => {
       if (
         gameState === "running" &&
-        askingRef.current &&
+        (playModeRef.current === "voice_match" || askingRef.current) &&
         (spaceHoldRef.current || autoListenRef.current)
       ) {
         try {
@@ -1489,8 +1492,8 @@ export default function HomePage() {
       setCountdownMs(0);
     }
 
-    // 触摸设备：带语音识别的游戏模式自动开启语音识别
-    if (isTouchDevice && (playMode === "voice_match" || playMode === "plane_shooter")) {
+    // 释义匹配：所有设备自动开启语音识别；其他语音模式仅触摸设备自动开启
+    if (playMode === "voice_match" || (isTouchDevice && playMode === "plane_shooter")) {
       autoListenRef.current = true;
       startSpeech();
     }
@@ -1617,6 +1620,8 @@ export default function HomePage() {
       if (event.code !== "Space") return;
       if (event.repeat) return;
       event.preventDefault();
+      // voice_match 模式始终自动监听，不需要按空格
+      if (playMode === "voice_match") return;
       const canListen =
         gameState === "running" &&
         (askingRef.current && (playMode === "plane_shooter" || Boolean(targetRef.current)));
@@ -1641,6 +1646,8 @@ export default function HomePage() {
 
       if (event.code !== "Space") return;
       event.preventDefault();
+      // voice_match 模式始终自动监听，不需要按空格
+      if (playMode === "voice_match") return;
       spaceHoldRef.current = false;
       setIsHoldingSpace(false);
       stopSpeech();
@@ -1931,8 +1938,8 @@ export default function HomePage() {
               <div className="mt-3 space-y-1.5 text-[11px] text-indigo-200/80">
                 {playMode === "voice_match" && (
                   <>
-                    <p>· 看中文，按住空格说出对应英文</p>
-                    <p>· 匹配成功自动进入下一题</p>
+                    <p>· 看中文，直接说出对应英文</p>
+                    <p>· 语音自动识别，匹配成功进入下一题</p>
                   </>
                 )}
                 {playMode === "plane_shooter" && (
@@ -2153,9 +2160,11 @@ export default function HomePage() {
                     {gameState === "running"
                       ? playMode === "spell_word"
                         ? "用键盘拼出正确单词，按回车确认"
-                        : isTouchDevice
-                          ? "游戏进行中（自动语音识别）"
-                          : "游戏进行中（按住空格可语音识别）"
+                        : playMode === "voice_match"
+                          ? "语音识别已开启，请直接说英文"
+                          : isTouchDevice
+                            ? "游戏进行中（自动语音识别）"
+                            : "游戏进行中（按住空格可语音识别）"
                       : "可开始新一局或查看本局成绩"}
                   </p>
                 </div>
