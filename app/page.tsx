@@ -2169,10 +2169,22 @@ export default function HomePage() {
                   </p>
                 </div>
                 {playMode === "voice_match" ? (
-                  <div className="max-w-[56vw] justify-self-center rounded-2xl border-2 border-emerald-300/60 bg-gradient-to-br from-emerald-500/25 via-emerald-400/15 to-teal-500/20 px-6 py-2.5 shadow-lg shadow-emerald-500/20 backdrop-blur-sm">
-                    <p className="truncate text-center text-3xl font-extrabold tracking-wide text-emerald-50 drop-shadow-[0_2px_8px_rgba(16,185,129,0.6)]">
-                      {currentMeaning || "准备开始..."}
-                    </p>
+                  <div className="flex items-center justify-self-center gap-2">
+                    <div className="max-w-[48vw] rounded-2xl border-2 border-emerald-300/60 bg-gradient-to-br from-emerald-500/25 via-emerald-400/15 to-teal-500/20 px-6 py-2.5 shadow-lg shadow-emerald-500/20 backdrop-blur-sm">
+                      <p className="truncate text-center text-3xl font-extrabold tracking-wide text-emerald-50 drop-shadow-[0_2px_8px_rgba(16,185,129,0.6)]">
+                        {currentMeaning || "准备开始..."}
+                      </p>
+                    </div>
+                    {gameState === "running" && targetId && (
+                      <button
+                        type="button"
+                        onClick={() => resolveRound("miss")}
+                        className="flex-shrink-0 rounded-lg border border-indigo-300/40 bg-indigo-500/15 px-2.5 py-1.5 text-xs font-medium text-indigo-200/90 transition hover:bg-indigo-500/30 hover:text-white"
+                        title="跳过当前词"
+                      >
+                        跳过 ⏭
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <div />
