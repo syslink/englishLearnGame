@@ -792,6 +792,38 @@ export default function HomePage() {
     }
   }, [pickNextSpellTarget, emitLikeBurst, bumpStudyHistory, bumpBatchResult]);
 
+  // ---- 拼单词模式：跳过当前单词，记为失败 ----
+  const skipSpell = useCallback(() => {
+    const tid = spellTargetIdRef.current;
+    if (!tid) return;
+    const target = wordsRef.current.find((w) => w.id === tid && w.status === "live");
+    if (!target) { pickNextSpellTarget(); return; }
+
+    setWords((prev) => {
+      const updated = prev.map((w) =>
+        w.id === tid ? { ...w, status: "missed" as const, revealedEn: true } : w
+      );
+      wordsRef.current = updated;
+      return updated;
+    });
+
+    const key = `${target.normalized}|${target.zh}`;
+    setMistakeMap((prevMap) => {
+      const existing = prevMap[key];
+      return {
+        ...prevMap,
+        [key]: { key, en: target.en, zh: target.zh, count: (existing?.count || 0) + 1 },
+      };
+    });
+    bumpStudyHistory({ en: target.en, zh: target.zh }, "wrong");
+    bumpBatchResult("wrong");
+    setStreak(0);
+    setDoneCount((v) => v + 1);
+    setFeedbackText(`已跳过：${target.en}`);
+    setSpellInput([]);
+    setTimeout(() => pickNextSpellTarget(), 200);
+  }, [pickNextSpellTarget, bumpStudyHistory, bumpBatchResult, setSpellInput]);
+
   const stopSpeech = useCallback(() => {
     const rec = speechRef.current;
     if (!rec) return;
@@ -2417,11 +2449,22 @@ export default function HomePage() {
                       <span className="inline-flex h-9 w-8 items-center justify-center rounded-lg border-2 border-dashed border-indigo-400/30 text-indigo-400/40">
                         _
                       </span>
+                      {spellTargetId && (
+                        <button
+                          type="button"
+                          onClick={skipSpell}
+                          className="ml-3 rounded-lg border border-rose-300/40 bg-rose-500/15 px-3 py-1.5 text-xs font-medium text-rose-100/90 transition hover:bg-rose-500/30 hover:text-white"
+                          title="跳过当前单词（记为失败）"
+                        >
+                          跳过 ⏭
+                        </button>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 text-xs text-indigo-300/60">
                       <span>Backspace 删除</span>
                       <span>Enter 确认</span>
                       <span>词组用空格分隔</span>
+                      <span>点击"跳过"放弃当前单词</span>
                     </div>
                   </div>
                 )}
