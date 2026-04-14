@@ -1772,7 +1772,7 @@ export default function HomePage() {
                 : llmStatus === "error" ? "bg-rose-400"
                 : "bg-indigo-400/60"
               }`} />
-              AI {llmStatus === "ready" ? "就绪" : llmStatus === "loading" ? "加载中" : llmStatus === "error" ? "未就绪" : "未加载"}
+              本地AI {llmStatus === "ready" ? "就绪" : llmStatus === "loading" ? "加载中" : llmStatus === "error" ? "未就绪" : "未加载"}
             </span>
             {llmStatus === "ready" && (
               <button
