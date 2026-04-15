@@ -1716,9 +1716,9 @@ export default function HomePage() {
   return (
     <main className="game-bg min-h-screen text-slate-100">
       {showBrowserWarning && (
-        <div className="sticky top-0 z-[100] flex items-center justify-between gap-3 border-b border-amber-400/40 bg-amber-500/15 px-4 py-2.5 backdrop-blur-md">
-          <div className="flex items-center gap-2 text-sm text-amber-100">
-            <span className="text-lg">⚠️</span>
+        <div className="sticky top-0 z-[100] flex items-center justify-between gap-2 border-b border-amber-400/40 bg-amber-500/15 px-3 py-2 backdrop-blur-md sm:px-4 sm:py-2.5">
+          <div className="flex items-start gap-2 text-xs text-amber-100 sm:items-center sm:text-sm">
+            <span className="text-base sm:text-lg">⚠️</span>
             <span>
               为获得最佳体验（语音识别、本地大模型），建议使用
               <a
@@ -1742,21 +1742,21 @@ export default function HomePage() {
           </button>
         </div>
       )}
-      <div className="mx-auto max-w-6xl px-4 pb-8 pt-6 md:px-6 md:pt-8">
+      <div className="mx-auto max-w-6xl px-3 pb-8 pt-4 sm:px-4 sm:pt-6 md:px-6 md:pt-8">
         {/* 顶部品牌区 */}
-        <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <header className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="flex items-baseline gap-2">
-              <span className="bg-gradient-to-r from-emerald-300 via-cyan-300 to-indigo-300 bg-clip-text text-4xl font-black tracking-tight text-transparent md:text-5xl">
+              <span className="bg-gradient-to-r from-emerald-300 via-cyan-300 to-indigo-300 bg-clip-text text-3xl font-black tracking-tight text-transparent sm:text-4xl md:text-5xl">
                 FlyWord
               </span>
-              <span className="text-2xl font-extrabold text-indigo-100 md:text-3xl">飞词</span>
+              <span className="text-xl font-extrabold text-indigo-100 sm:text-2xl md:text-3xl">飞词</span>
             </h1>
-            <p className="mt-1 text-sm text-indigo-200/80">
+            <p className="mt-1 text-xs text-indigo-200/80 sm:text-sm">
               开口就记住 · AI 生词 · 语音识别 · 像打飞机一样击落每个单词
             </p>
           </div>
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 ${
               llmStatus === "ready"
                 ? "border border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
@@ -1787,8 +1787,8 @@ export default function HomePage() {
         </header>
 
         {/* 模式选择卡片 */}
-        <section className="mb-6">
-          <div className="mb-3 flex items-center justify-between">
+        <section className="mb-5 sm:mb-6">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold tracking-wide text-indigo-200/90">选择游戏模式</h2>
             <div className="flex items-center gap-2 text-xs text-indigo-200/70">
               <label htmlFor="roundSeconds">倒计时</label>
@@ -2130,7 +2130,7 @@ export default function HomePage() {
               <span className="text-indigo-300/60 transition group-open:rotate-180">▾</span>
             </summary>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-              <div ref={llmDropdownRef} className="relative">
+              <div ref={llmDropdownRef} className="relative w-full sm:w-auto">
                 <input
                   type="text"
                   value={llmDropdownOpen ? llmModelFilter : (llmModelId || "加载模型列表中...")}
@@ -2138,10 +2138,10 @@ export default function HomePage() {
                   onFocus={() => { setLlmDropdownOpen(true); setLlmModelFilter(""); }}
                   disabled={llmStatus === "loading" || !llmAvailableModels.length}
                   placeholder="搜索模型..."
-                  className="w-[280px] rounded-lg border border-indigo-300/30 bg-slate-900/80 px-2 py-1 text-sm text-white placeholder-indigo-300/40 outline-none disabled:opacity-60"
+                  className="w-full rounded-lg border border-indigo-300/30 bg-slate-900/80 px-2 py-1 text-sm text-white placeholder-indigo-300/40 outline-none disabled:opacity-60 sm:w-[280px]"
                 />
                 {llmDropdownOpen && llmAvailableModels.length > 0 && (
-                  <div className="absolute left-0 top-full z-50 mt-1 max-h-60 w-[360px] overflow-y-auto rounded-lg border border-indigo-300/30 bg-slate-900/95 py-1 shadow-xl">
+                  <div className="absolute left-0 top-full z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-indigo-300/30 bg-slate-900/95 py-1 shadow-xl sm:w-[360px]">
                     {filteredLlmModels.length ? (
                       filteredLlmModels.map((m) => (
                         <button
@@ -2183,27 +2183,50 @@ export default function HomePage() {
         {isGameModalOpen ? (
           <div className="fixed inset-0 z-50 flex items-stretch justify-stretch bg-slate-950/75">
             <div className="relative flex h-full w-full flex-col overflow-hidden border border-indigo-200/35 bg-slate-950/95 shadow-2xl">
-              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-b border-indigo-300/30 bg-slate-950/95 px-4 py-3">
-                <div className="justify-self-start">
-                  <p className="text-sm font-semibold text-indigo-100">
-                    {playMode === "voice_match" ? "释义匹配模式" : playMode === "spell_word" ? "拼单词模式" : "飞机射击模式"}
-                  </p>
-                  <p className="text-xs text-indigo-200/80">
-                    {gameState === "running"
-                      ? playMode === "spell_word"
-                        ? "用键盘拼出正确单词，按回车确认"
-                        : playMode === "voice_match"
-                          ? "语音识别已开启，请直接说英文"
-                          : isTouchDevice
-                            ? "游戏进行中（自动语音识别）"
-                            : "游戏进行中（按住空格可语音识别）"
-                      : "可开始新一局或查看本局成绩"}
-                  </p>
+              <div className="flex flex-col gap-2 border-b border-indigo-300/30 bg-slate-950/95 px-3 py-2 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-3 sm:px-4 sm:py-3">
+                {/* 顶行：模式名 + 倒计时 + 关闭 */}
+                <div className="flex items-center justify-between gap-2 sm:justify-self-start">
+                  <div>
+                    <p className="text-xs font-semibold text-indigo-100 sm:text-sm">
+                      {playMode === "voice_match" ? "释义匹配" : playMode === "spell_word" ? "拼单词" : "飞机射击"}
+                    </p>
+                    <p className="hidden text-xs text-indigo-200/80 sm:block">
+                      {gameState === "running"
+                        ? playMode === "spell_word"
+                          ? "用键盘拼出正确单词，按回车确认"
+                          : playMode === "voice_match"
+                            ? "语音识别已开启，请直接说英文"
+                            : isTouchDevice
+                              ? "游戏进行中（自动语音识别）"
+                              : "游戏进行中（按住空格可语音识别）"
+                        : "可开始新一局或查看本局成绩"}
+                    </p>
+                  </div>
+                  {/* 手机端：倒计时+关闭按钮放在模式名旁 */}
+                  <div className="flex items-center gap-1.5 sm:hidden">
+                    {playMode === "voice_match" && (
+                      <div className="rounded-md border border-amber-300/35 bg-amber-500/10 px-2 py-0.5 text-right">
+                        <p className="text-[9px] leading-tight text-amber-100/80">倒计时</p>
+                        <p className="text-xs font-bold leading-tight text-amber-100">
+                          {gameState === "running" ? `${(countdownMs / 1000).toFixed(1)}s` : `${roundSeconds}s`}
+                        </p>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={closeGameModal}
+                      className="rounded-md border border-indigo-300/40 px-2 py-1 text-[11px] font-semibold text-indigo-100 transition hover:bg-indigo-400/20"
+                    >
+                      {gameState === "running" ? "结束" : "关闭"}
+                    </button>
+                  </div>
                 </div>
+
+                {/* 中文释义（仅 voice_match）：手机端占满宽度 */}
                 {playMode === "voice_match" ? (
-                  <div className="flex items-center justify-self-center gap-2">
-                    <div className="max-w-[48vw] rounded-2xl border-2 border-emerald-300/60 bg-gradient-to-br from-emerald-500/25 via-emerald-400/15 to-teal-500/20 px-6 py-2.5 shadow-lg shadow-emerald-500/20 backdrop-blur-sm">
-                      <p className="truncate text-center text-3xl font-extrabold tracking-wide text-emerald-50 drop-shadow-[0_2px_8px_rgba(16,185,129,0.6)]">
+                  <div className="flex items-center justify-center gap-2 sm:justify-self-center">
+                    <div className="flex-1 rounded-xl border-2 border-emerald-300/60 bg-gradient-to-br from-emerald-500/25 via-emerald-400/15 to-teal-500/20 px-3 py-1.5 shadow-lg shadow-emerald-500/20 backdrop-blur-sm sm:max-w-[48vw] sm:flex-initial sm:rounded-2xl sm:px-6 sm:py-2.5">
+                      <p className="truncate text-center text-xl font-extrabold tracking-wide text-emerald-50 drop-shadow-[0_2px_8px_rgba(16,185,129,0.6)] sm:text-3xl">
                         {currentMeaning || "准备开始..."}
                       </p>
                     </div>
@@ -2211,7 +2234,7 @@ export default function HomePage() {
                       <button
                         type="button"
                         onClick={() => resolveRound("miss")}
-                        className="flex-shrink-0 rounded-lg border border-indigo-300/40 bg-indigo-500/15 px-2.5 py-1.5 text-xs font-medium text-indigo-200/90 transition hover:bg-indigo-500/30 hover:text-white"
+                        className="flex-shrink-0 rounded-lg border border-indigo-300/40 bg-indigo-500/15 px-2 py-1.5 text-[11px] font-medium text-indigo-200/90 transition hover:bg-indigo-500/30 hover:text-white sm:px-2.5 sm:text-xs"
                         title="跳过当前词"
                       >
                         跳过 ⏭
@@ -2219,9 +2242,11 @@ export default function HomePage() {
                     )}
                   </div>
                 ) : (
-                  <div />
+                  <div className="hidden sm:block" />
                 )}
-                <div className="flex items-center justify-self-end gap-2">
+
+                {/* 桌面端右侧：倒计时+关闭 */}
+                <div className="hidden items-center justify-self-end gap-2 sm:flex">
                   {playMode === "voice_match" ? (
                     <div className="rounded-lg border border-amber-300/35 bg-amber-500/10 px-3 py-1.5 text-right">
                       <p className="text-[11px] text-amber-100/80">倒计时</p>

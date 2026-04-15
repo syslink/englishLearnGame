@@ -265,8 +265,8 @@ export default function LlmChat({
   if (!open) return null;
 
   const content = (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
-      <div className="flex h-[600px] w-[440px] flex-col rounded-2xl border border-indigo-300/30 bg-slate-950/95 shadow-2xl backdrop-blur-md">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-2 sm:p-4">
+      <div className="flex h-full max-h-[600px] w-full max-w-[440px] flex-col rounded-2xl border border-indigo-300/30 bg-slate-950/95 shadow-2xl backdrop-blur-md">
         {/* 标题栏 */}
         <div className="flex items-center justify-between border-b border-indigo-300/25 px-4 py-2.5">
           <div>
