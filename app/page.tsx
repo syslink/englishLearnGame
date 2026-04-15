@@ -2339,9 +2339,12 @@ export default function HomePage() {
                     displayText = word.en;
                   }
 
+                  const spellClickable = playMode === "spell_word" && !word.exploding;
                   return (
                     <div
                       key={word.id}
+                      onClick={spellClickable ? () => speakText(word.en) : undefined}
+                      title={spellClickable ? `点击朗读：${word.en}` : undefined}
                       className={[
                         "absolute top-0 rounded-xl border px-3 py-1.5 text-lg font-bold tracking-wide shadow",
                         isPlaneTarget ? "bg-rose-900/90" : isSpellTarget ? "bg-amber-900/90" : "bg-blue-950/90",
@@ -2351,6 +2354,7 @@ export default function HomePage() {
                         isSpellTarget ? "border-amber-300 shadow-amber-400/40" : "",
                         word.spellUnlocked ? "border-emerald-400 bg-emerald-900/80" : "",
                         word.exploding ? "animate-boom" : "",
+                        spellClickable ? "cursor-pointer hover:brightness-125 active:scale-95 transition" : "",
                       ].join(" ")}
                       style={{ left: `${word.x}px`, transform: `translateY(${word.y}px)` }}
                     >
