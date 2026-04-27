@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import categoriesData from "./categories.json";
 import LlmChat from "./LlmChat";
+import AuthModal, { type AuthUser } from "./AuthModal";
 
 type ScenarioItem = {
   id: number;
@@ -278,6 +279,39 @@ export default function HomePage() {
   const [llmGenerating, setLlmGenerating] = useState(false);
   const [llmTopic, setLlmTopic] = useState("");
   const [llmChatOpen, setLlmChatOpen] = useState(false);
+
+  // ---- 用户鉴权（暂时禁用，需要时取消注释） ----
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const authLoaded = false; // 暂时不加载
+
+  // useEffect(() => {
+  //   let cancelled = false;
+  //   fetch("/api/auth/me", { credentials: "same-origin" })
+  //     .then((r) => r.json())
+  //     .then((data) => {
+  //       if (!cancelled) setAuthUser(data.user || null);
+  //     })
+  //     .catch(() => {})
+  //     .finally(() => {
+  //       if (!cancelled) setAuthLoaded(true);
+  //     });
+  //   return () => {
+  //     cancelled = true;
+  //   };
+  // }, []);
+
+  // const logout = useCallback(async () => {
+  //   try {
+  //     await fetch("/api/auth/logout", {
+  //       method: "POST",
+  //       credentials: "same-origin",
+  //     });
+  //   } catch {
+  //     // ignore
+  //   }
+  //   setAuthUser(null);
+  // }, []);
   const [llmModelFilter, setLlmModelFilter] = useState("");
   // ---- 拼单词模式 ----
   const [spellInput, _setSpellInput] = useState<string[]>([]);
@@ -1783,6 +1817,42 @@ export default function HomePage() {
                 💬 跟 AI 对话
               </button>
             )}
+            {/* 用户登录/注册按钮 — 暂时隐藏，需要时取消注释即可
+            {authLoaded && (authUser ? (
+              <div className="flex items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-500/10 py-0.5 pl-0.5 pr-2 text-xs">
+                {authUser.avatar ? (
+                  <img
+                    src={authUser.avatar}
+                    alt={authUser.username}
+                    className="h-6 w-6 rounded-full object-cover"
+                  />
+                ) : (
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-500/30 text-[10px]">
+                    👤
+                  </span>
+                )}
+                <span className="max-w-[6rem] truncate font-semibold text-emerald-100">
+                  {authUser.username}
+                </span>
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="rounded px-1 text-[10px] text-indigo-300/80 hover:text-white"
+                  title="退出登录"
+                >
+                  退出
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAuthModalOpen(true)}
+                className="rounded-full border border-indigo-300/40 bg-indigo-500/15 px-3 py-1 text-xs font-semibold text-indigo-100 transition hover:bg-indigo-400/25"
+              >
+                登录 / 注册
+              </button>
+            ))}
+            */}
           </div>
         </header>
 
@@ -2568,6 +2638,14 @@ export default function HomePage() {
 
       {/* LLM 对话浮窗 */}
       {<LlmChat engine={llmEngine} modelId={llmModelId} open={llmChatOpen} onClose={() => setLlmChatOpen(false)} selectedVoiceURI={selectedVoiceURI} ttsVoices={ttsVoices} />}
+
+      {/* 登录 / 注册 — 暂时隐藏，需要时取消注释
+      <AuthModal
+        open={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        onSuccess={(u) => setAuthUser(u)}
+      />
+      */}
     </main>
   );
 }

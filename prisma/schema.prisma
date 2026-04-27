@@ -1,0 +1,27 @@
+// FlyWord 用户系统数据模型
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Vercel Prisma Postgres / Postgres 集成会同时提供 DIRECT_URL (未池化) 供 migration 使用
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  // username 不区分大小写唯一：另外再存小写版本用于查询
+  username     String   @unique
+  usernameLc   String   @unique
+  passwordHash String
+  // 头像：可以是 URL 或 base64 data URL（限制大小在应用层校验）
+  avatar       String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  lastLoginAt  DateTime?
+
+  @@index([usernameLc])
+}
