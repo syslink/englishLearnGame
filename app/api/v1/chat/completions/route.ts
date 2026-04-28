@@ -1,9 +1,9 @@
 import {
-  getOpenAIConfig,
-  DEFAULT_CHAT_MODEL,
+  getCloudProviderConfig,
   upstreamHeaders,
   errorJson,
   CORS_HEADERS,
+  describeFetchError,
 } from "@/lib/openai";
 
 export const runtime = "nodejs";
@@ -17,24 +17,25 @@ export function OPTIONS() {
 /**
  * POST /api/v1/chat/completions
  *
- * 兼容 OpenAI Chat Completions API，支持流式和非流式。
+ * 兼容 OpenAI Chat Completions API，支持 OpenAI / DeepSeek，支持流式和非流式。
  * 请求体格式与 OpenAI 完全一致，会透传到上游 API。
  *
- * 如未指定 model，使用 OPENAI_CHAT_MODEL 环境变量或默认 gpt-4o-mini。
+ * 扩展字段 provider: "openai" | "deepseek" 用于选择云端供应商。
+ * 如未指定 model，使用对应供应商的默认模型。
  */
 export async function POST(req: Request) {
-  let config;
-  try {
-    config = getOpenAIConfig();
-  } catch {
-    return errorJson("服务端 AI 未配置", 500);
-  }
-
   let body: Record<string, unknown>;
   try {
     body = await req.json();
   } catch {
     return errorJson("请求体格式错误", 400);
+  }
+
+  let config;
+  try {
+    config = getCloudProviderConfig(body.provider);
+  } catch {
+    return errorJson("所选云端 AI 未配置", 500);
   }
 
   // 基础校验
@@ -44,8 +45,9 @@ export async function POST(req: Request) {
 
   // 补默认 model
   if (!body.model) {
-    body.model = DEFAULT_CHAT_MODEL;
+    body.model = config.defaultModel;
   }
+  delete body.provider;
 
   const isStream = body.stream === true;
 
@@ -58,7 +60,7 @@ export async function POST(req: Request) {
 
     if (!upstream.ok) {
       const errText = await upstream.text().catch(() => "unknown error");
-      console.error("chat upstream error:", upstream.status, errText);
+      console.error(`${config.label} chat upstream error:`, upstream.status, errText);
       return errorJson(
         `上游 API 错误 (${upstream.status})`,
         upstream.status >= 400 && upstream.status < 500 ? upstream.status : 502,
@@ -83,6 +85,6 @@ export async function POST(req: Request) {
     return Response.json(data, { headers: CORS_HEADERS });
   } catch (err) {
     console.error("chat completions error:", err);
-    return errorJson("请求上游 API 失败", 502);
+    return errorJson(describeFetchError(err, config.label), 502);
   }
 }

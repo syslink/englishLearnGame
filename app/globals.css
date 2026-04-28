@@ -25,6 +25,21 @@ body {
     animation: like-float-up 0.85s ease-out forwards;
     text-shadow: 0 0 10px rgba(52, 211, 153, 0.65);
   }
+
+  .robot-eye {
+    animation: robot-eye-pulse 1.4s ease-in-out infinite;
+    box-shadow: 0 0 18px rgba(34, 211, 238, 0.26);
+  }
+
+  .robot-wave-bar {
+    animation: robot-wave-bounce 780ms ease-in-out infinite alternate;
+    box-shadow: 0 0 12px rgba(45, 212, 191, 0.45);
+    transform-origin: bottom;
+  }
+
+  .spell-letter-pop {
+    animation: spell-letter-pop 180ms ease-out;
+  }
 }
 
 @keyframes like-float-up {
@@ -39,5 +54,41 @@ body {
   100% {
     opacity: 0;
     transform: translateY(-40px) scale(1.2);
+  }
+}
+
+@keyframes robot-wave-bounce {
+  0% {
+    opacity: 0.42;
+    transform: scaleY(0.35);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleY(1.25);
+  }
+}
+
+@keyframes robot-eye-pulse {
+  0%,
+  100% {
+    filter: brightness(0.92);
+    transform: scale(1);
+  }
+  50% {
+    filter: brightness(1.25);
+    transform: scale(1.06);
+  }
+}
+
+@keyframes spell-letter-pop {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  45% {
+    transform: translateY(-8px) scale(1.12);
+    box-shadow: 0 0 16px rgba(251, 191, 36, 0.45);
+  }
+  100% {
+    transform: translateY(0) scale(1);
   }
 }

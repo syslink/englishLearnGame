@@ -5,6 +5,7 @@ import {
   upstreamHeaders,
   errorJson,
   CORS_HEADERS,
+  describeFetchError,
 } from "@/lib/openai";
 
 export const runtime = "nodejs";
@@ -20,8 +21,8 @@ export function OPTIONS() {
  * 兼容 OpenAI TTS API — 将文本转为语音音频。
  * 请求体 JSON：
  *   input:            要合成的文本（必须，最大 4096 字符）
- *   model:            模型名（可选，默认 tts-1）
- *   voice:            发音人（可选，默认 alloy）
+ *   model:            模型名（可选，默认 gpt-4o-mini-tts）
+ *   voice:            发音人（可选，默认 marin）
  *   response_format:  音频格式 mp3/opus/aac/flac/wav/pcm（可选，默认 mp3）
  *   speed:            语速 0.25-4.0（可选，默认 1.0）
  */
@@ -89,6 +90,6 @@ export async function POST(req: Request) {
     });
   } catch (err) {
     console.error("tts error:", err);
-    return errorJson("语音合成请求失败", 502);
+    return errorJson(describeFetchError(err, "OpenAI TTS"), 502);
   }
 }

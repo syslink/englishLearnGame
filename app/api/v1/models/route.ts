@@ -1,8 +1,9 @@
 import {
-  getOpenAIConfig,
+  getCloudProviderConfig,
   upstreamHeaders,
   errorJson,
   CORS_HEADERS,
+  describeFetchError,
 } from "@/lib/openai";
 
 export const runtime = "nodejs";
@@ -15,14 +16,15 @@ export function OPTIONS() {
 /**
  * GET /api/v1/models
  *
- * 兼容 OpenAI Models API — 列出上游可用模型。
+ * 兼容 OpenAI Models API — 按 provider 列出上游可用模型。
  */
-export async function GET() {
+export async function GET(req: Request) {
   let config;
   try {
-    config = getOpenAIConfig();
+    const provider = new URL(req.url).searchParams.get("provider") || "openai";
+    config = getCloudProviderConfig(provider);
   } catch {
-    return errorJson("服务端 AI 未配置", 500);
+    return errorJson("所选云端 AI 未配置", 500);
   }
 
   try {
@@ -43,6 +45,6 @@ export async function GET() {
     return Response.json(data, { headers: CORS_HEADERS });
   } catch (err) {
     console.error("models error:", err);
-    return errorJson("获取模型列表失败", 502);
+    return errorJson(describeFetchError(err, config.label), 502);
   }
 }
