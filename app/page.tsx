@@ -57,9 +57,10 @@ import {
   writeCachedExplanation,
 } from "./game/wordExplanationCache";
 
-function normalizeGameDuration(seconds: number): number {
-  if (!Number.isFinite(seconds) || seconds <= 0) return 30;
-  return Math.max(1, Math.floor(seconds));
+function normalizeGameDuration(seconds: string | number): number {
+  const value = typeof seconds === "string" ? Number(seconds.trim()) : seconds;
+  if (!Number.isFinite(value) || value <= 0) return 30;
+  return Math.max(1, Math.floor(value));
 }
 
 function splitSpeechSegments(text: string, maxChars = 90): string[] {
@@ -141,7 +142,7 @@ export default function HomePage() {
   const [planeTargetId, setPlaneTargetId] = useState<string | null>(null);
   const [recognizedText, setRecognizedText] = useState("");
   const [countdownMs, setCountdownMs] = useState(ROUND_MS);
-  const [roundSeconds, setRoundSeconds] = useState(30);
+  const [roundSeconds, setRoundSeconds] = useState("30");
   const [fallHeightPx] = useState(600);
   const [planeDropChineseOnly, setPlaneDropChineseOnly] = useState(false);
   const [gameSpeechEngine, setGameSpeechEngine] = useState<GameSpeechEngine>("browser");
@@ -264,6 +265,7 @@ export default function HomePage() {
   }, []);
   const [spellTargetId, setSpellTargetId] = useState<string | null>(null);
   const [spellPulseIndex, setSpellPulseIndex] = useState<number | null>(null);
+  const [missingLetterCandidateMap, setMissingLetterCandidateMap] = useState<Record<string, string[]>>({});
   const [llmDropdownOpen, setLlmDropdownOpen] = useState(false);
   const llmDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -350,24 +352,39 @@ export default function HomePage() {
       return candidates;
     }
 
-    const answer = getSpellChallengeAnswer(currentSpellTarget);
-    const next = answer[spellInput.length];
-    if (!next) return [];
-    const wordLetters = Array.from(new Set(answer.split("").filter((ch) => ch !== next)));
-    const alphabet = "abcdefghijklmnopqrstuvwxyz".split("").filter((ch) => ch !== next && !wordLetters.includes(ch));
-    const distractors = shuffleLetters([...wordLetters, ...alphabet]).slice(0, 7);
-    return shuffleLetters([next, ...distractors]).map((ch, index) => ({
+    const key = `${currentSpellTarget.id}:${spellInput.length}`;
+    const fixedCandidates = missingLetterCandidateMap[key] || [];
+    return fixedCandidates.map((ch, index) => ({
       id: `${ch}-${index}`,
       label: ch,
       disabled: false,
     }));
-  }, [currentSpellTarget, spellInput]);
+  }, [currentSpellTarget, missingLetterCandidateMap, spellInput]);
   const aiGenerationAvailable = Boolean(selectedCloudProvider?.configured) || llmStatus === "ready";
   const aiGenerationLabel = selectedCloudProvider?.configured
     ? `${selectedCloudProvider.label} 生成`
     : llmStatus === "ready"
       ? "本地 AI 生成"
       : "AI 未配置";
+
+  useEffect(() => {
+    if (!currentSpellTarget || currentSpellTarget.spellChallengeMode !== "missing_letters") return;
+    const answer = getSpellChallengeAnswer(currentSpellTarget);
+    const next = answer[spellInput.length];
+    if (!next) return;
+
+    const key = `${currentSpellTarget.id}:${spellInput.length}`;
+    setMissingLetterCandidateMap((prev) => {
+      if (prev[key]) return prev;
+      const wordLetters = Array.from(new Set(answer.split("").filter((ch) => ch !== next)));
+      const alphabet = "abcdefghijklmnopqrstuvwxyz".split("").filter((ch) => ch !== next && !wordLetters.includes(ch));
+      const distractors = shuffleLetters([...wordLetters, ...alphabet]).slice(0, 7);
+      return {
+        ...prev,
+        [key]: shuffleLetters([next, ...distractors]),
+      };
+    });
+  }, [currentSpellTarget, spellInput.length]);
 
   useEffect(() => {
     wordsRef.current = words;
@@ -1339,6 +1356,7 @@ export default function HomePage() {
       setSpellTargetId(null);
       spellTargetIdRef.current = null;
       setSpellInput([]);
+      setMissingLetterCandidateMap({});
 
       return;
     }
@@ -1347,6 +1365,7 @@ export default function HomePage() {
     setSpellTargetId(next.id);
     spellTargetIdRef.current = next.id;
     setSpellInput([]);
+    setMissingLetterCandidateMap({});
   }, []);
 
   const inputSpellCharacter = useCallback((rawChar: string) => {
@@ -2166,6 +2185,7 @@ export default function HomePage() {
     setSpellTargetId(null);
     spellTargetIdRef.current = null;
     setSpellInput([]);
+    setMissingLetterCandidateMap({});
     currentBatchIdRef.current = null;
     lastFrameTsRef.current = null;
     clearRaf();
@@ -2361,7 +2381,7 @@ export default function HomePage() {
       return;
     }
     const safeRoundSeconds = normalizeGameDuration(roundSeconds);
-    setRoundSeconds(safeRoundSeconds);
+    setRoundSeconds(String(safeRoundSeconds));
     roundDurationRef.current = safeRoundSeconds * 1000;
 
     const batchEntries = parsed.map((w) => ({ en: w.en, zh: w.zh }));
@@ -2396,6 +2416,7 @@ export default function HomePage() {
     setSpellTargetId(null);
     spellTargetIdRef.current = null;
     setSpellInput([]);
+    setMissingLetterCandidateMap({});
     lastFrameTsRef.current = null;
     planeTargetIdRef.current = null;
     planeMoveDirRef.current = 0;

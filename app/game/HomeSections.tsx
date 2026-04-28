@@ -203,7 +203,7 @@ export function LexiconAndStartPanel({
   openAiSpeechSpeed: number;
   explainingWordKey: string | null;
   timeBoost: number;
-  roundSeconds: number;
+  roundSeconds: string;
   planeDropChineseOnly: boolean;
   gameSpeechEngine: GameSpeechEngine;
   spellChallengeMode: SpellChallengeMode;
@@ -219,7 +219,7 @@ export function LexiconAndStartPanel({
   onStart: () => void;
   onStop: () => void;
   onUseTimeBoost: () => void;
-  onRoundSecondsChange: (seconds: number) => void;
+  onRoundSecondsChange: (seconds: string) => void;
   onPlaneDropChineseOnlyChange: (enabled: boolean) => void;
   onGameSpeechEngineChange: (engine: GameSpeechEngine) => void;
   onSpellChallengeModeChange: (mode: SpellChallengeMode) => void;
@@ -376,11 +376,7 @@ export function LexiconAndStartPanel({
               id="gameDurationSeconds"
               type="number"
               value={roundSeconds}
-              onChange={(e) => {
-                const value = Number(e.target.value);
-                if (!Number.isFinite(value)) return;
-                onRoundSecondsChange(value);
-              }}
+              onChange={(e) => onRoundSecondsChange(e.target.value)}
               disabled={gameState === "running"}
               className="w-20 rounded-md border border-emerald-300/30 bg-slate-900/80 px-2 py-1 text-center text-xs text-white outline-none focus:border-emerald-400 disabled:opacity-60"
             />
