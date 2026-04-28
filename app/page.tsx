@@ -2686,7 +2686,7 @@ export default function HomePage() {
         onAsk={askRobotTeacher}
         onVoiceAsk={askRobotTeacherByVoice}
       />
-      {showBrowserWarning && (
+      {false && showBrowserWarning && (
         <BrowserWarning onClose={() => setShowBrowserWarning(false)} />
       )}
       <div className="mx-auto max-w-6xl px-3 pb-8 pt-4 sm:px-4 sm:pt-6 md:px-6 md:pt-8">

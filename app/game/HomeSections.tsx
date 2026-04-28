@@ -68,7 +68,7 @@ export function AppHeader({
           开口就记住 · AI 生词 · 语音识别 · 像打飞机一样击落每个单词
         </p>
       </div>
-      <div className="flex flex-wrap items-center gap-2 text-xs">
+      {/* <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 ${
           llmStatus === "ready"
             ? "border border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
@@ -95,7 +95,7 @@ export function AppHeader({
             💬 跟 AI 对话
           </button>
         )}
-      </div>
+      </div> */}
     </header>
   );
 }
