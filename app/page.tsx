@@ -13,7 +13,6 @@ import {
   ReviewPanels,
 } from "./game/HomeSections";
 import {
-  DEFAULT_WORDS,
   OPENAI_TTS_VOICES,
   ROUND_MS,
   SCENARIOS,
@@ -134,7 +133,7 @@ export default function HomePage() {
   const speechRef = useRef<SpeechRecognitionLike | null>(null);
   const roundDurationRef = useRef(ROUND_MS);
 
-  const [wordInput, setWordInput] = useState(DEFAULT_WORDS);
+  const [wordInput, setWordInput] = useState("");
   const [words, setWords] = useState<WordItem[]>([]);
   const [playMode, setPlayMode] = useState<PlayMode>("plane_shooter");
   const [gameState, setGameState] = useState<GameState>("idle");
@@ -352,7 +351,7 @@ export default function HomePage() {
       return candidates;
     }
 
-    const key = `${currentSpellTarget.id}:${spellInput.length}`;
+    const key = currentSpellTarget.id;
     const fixedCandidates = missingLetterCandidateMap[key] || [];
     return fixedCandidates.map((ch, index) => ({
       id: `${ch}-${index}`,
@@ -370,21 +369,18 @@ export default function HomePage() {
   useEffect(() => {
     if (!currentSpellTarget || currentSpellTarget.spellChallengeMode !== "missing_letters") return;
     const answer = getSpellChallengeAnswer(currentSpellTarget);
-    const next = answer[spellInput.length];
-    if (!next) return;
-
-    const key = `${currentSpellTarget.id}:${spellInput.length}`;
+    const key = currentSpellTarget.id;
     setMissingLetterCandidateMap((prev) => {
       if (prev[key]) return prev;
-      const wordLetters = Array.from(new Set(answer.split("").filter((ch) => ch !== next)));
-      const alphabet = "abcdefghijklmnopqrstuvwxyz".split("").filter((ch) => ch !== next && !wordLetters.includes(ch));
-      const distractors = shuffleLetters([...wordLetters, ...alphabet]).slice(0, 7);
+      const uniqueAnswerLetters = Array.from(new Set(answer.split("")));
+      const alphabet = "abcdefghijklmnopqrstuvwxyz".split("").filter((ch) => !uniqueAnswerLetters.includes(ch));
+      const distractors = shuffleLetters(alphabet).slice(0, Math.max(0, 10 - uniqueAnswerLetters.length));
       return {
         ...prev,
-        [key]: shuffleLetters([next, ...distractors]),
+        [key]: shuffleLetters([...uniqueAnswerLetters, ...distractors]),
       };
     });
-  }, [currentSpellTarget, spellInput.length]);
+  }, [currentSpellTarget]);
 
   useEffect(() => {
     wordsRef.current = words;
@@ -524,6 +520,13 @@ export default function HomePage() {
       const parsed = JSON.parse(raw) as Record<string, StudyBatchRecord>;
       if (parsed && typeof parsed === "object") {
         setStudyBatchMap(parsed);
+        const latest = Object.values(parsed)
+          .filter((batch) => Array.isArray(batch.words) && batch.words.length > 0)
+          .sort((a, b) => b.lastPlayedAt - a.lastPlayedAt)[0];
+        if (latest) {
+          setWordInput(latest.words.join("\n"));
+          setFeedbackText(`已自动载入最近学习的 ${latest.wordCount} 个词条`);
+        }
       }
     } catch {
       // ignore corrupted local cache
@@ -2937,11 +2940,14 @@ export default function HomePage() {
                     displayText = word.en;
                   }
 
-                  const spellClickable = playMode === "spell_word" && !word.exploding;
+                  const spellClickable = playMode === "spell_word" && !word.exploding && !isTouchDevice;
                   return (
                     <div
                       key={word.id}
-                      onClick={spellClickable ? () => speakText(word.en) : undefined}
+                      onClick={spellClickable ? (event) => {
+                        event.stopPropagation();
+                        speakText(word.en);
+                      } : undefined}
                       title={spellClickable ? `点击朗读：${word.en}` : undefined}
                       className={[
                         "absolute top-0 rounded-xl border px-3 py-1.5 text-lg font-bold tracking-wide shadow",
@@ -2952,7 +2958,7 @@ export default function HomePage() {
                         isSpellTarget ? "border-amber-300 shadow-amber-400/40" : "",
                         word.spellUnlocked ? "border-emerald-400 bg-emerald-900/80" : "",
                         word.exploding ? "animate-boom" : "",
-                        spellClickable ? "cursor-pointer hover:brightness-125 active:scale-95 transition" : "",
+                        spellClickable ? "cursor-pointer hover:brightness-125 transition" : "",
                       ].join(" ")}
                       style={{ left: `${word.x}px`, transform: `translateY(${word.y}px)` }}
                     >
@@ -3075,7 +3081,11 @@ export default function HomePage() {
 
                 {/* 拼单词模式：底部输入显示区 */}
                 {playMode === "spell_word" && gameState === "running" && (
-                  <div className="absolute bottom-0 left-0 right-0 z-[10] flex flex-col items-center gap-2 border-t border-indigo-300/20 bg-slate-950/90 px-4 py-3 backdrop-blur-sm">
+                  <div
+                    className="absolute bottom-0 left-0 right-0 z-[10] flex flex-col items-center gap-2 border-t border-indigo-300/20 bg-slate-950/90 px-4 py-3 backdrop-blur-sm"
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={(event) => event.stopPropagation()}
+                  >
                     {currentSpellTarget?.spellChallengeMode === "missing_letters" && (
                       <p className="text-xs text-emerald-200/80">
                         按顺序输入完整单词，已显示字母会跳一下作为反馈
@@ -3171,6 +3181,7 @@ export default function HomePage() {
                       <div className="mt-1 flex max-w-full flex-wrap justify-center gap-2">
                         <button
                           type="button"
+                          onPointerDown={(event) => event.stopPropagation()}
                           onClick={() => setSpellInput((prev) => prev.slice(0, -1))}
                           disabled={!spellInput.length}
                           className="rounded-xl border border-indigo-300/35 bg-indigo-500/10 px-3 py-2 text-xs font-bold text-indigo-100 transition hover:bg-indigo-400/20 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
@@ -3179,8 +3190,9 @@ export default function HomePage() {
                         </button>
                         <button
                           type="button"
+                          onPointerDown={(event) => event.stopPropagation()}
                           onClick={() => confirmSpell()}
-                          disabled={!spellInput.length}
+                          disabled={!currentSpellTarget}
                           className="rounded-xl border border-emerald-300/45 bg-emerald-500/20 px-3 py-2 text-xs font-bold text-emerald-50 transition hover:bg-emerald-400/30 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
                         >
                           确认
@@ -3189,6 +3201,7 @@ export default function HomePage() {
                           <button
                             key={candidate.id}
                             type="button"
+                            onPointerDown={(event) => event.stopPropagation()}
                             onClick={() => inputSpellCharacter(candidate.label)}
                             disabled={candidate.disabled}
                             className={`min-w-10 rounded-xl border px-3 py-2 text-base font-black uppercase shadow transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-35 ${
@@ -3204,6 +3217,7 @@ export default function HomePage() {
                         {currentSpellTarget.spellChallengeMode === "missing_letters" && (
                           <button
                             type="button"
+                            onPointerDown={(event) => event.stopPropagation()}
                             onClick={() => {
                               const answer = getSpellChallengeAnswer(currentSpellTarget);
                               const next = answer[spellInput.length];
