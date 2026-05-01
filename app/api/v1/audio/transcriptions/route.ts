@@ -1,9 +1,11 @@
 import {
   getOpenAIConfig,
+  getSpeechRecognitionProviderConfig,
   DEFAULT_STT_MODEL,
   upstreamHeaders,
   errorJson,
   CORS_HEADERS,
+  describeFetchError,
 } from "@/lib/openai";
 
 export const runtime = "nodejs";
@@ -16,8 +18,9 @@ export function OPTIONS() {
 /**
  * POST /api/v1/audio/transcriptions
  *
- * 兼容 OpenAI Whisper API — 将音频文件转为文字。
+ * 兼容云端 ASR API — 将音频文件转为文字。
  * 请求体为 multipart/form-data（与 OpenAI 一致）：
+ *   provider: openai/aliyun（可选，默认 openai）
  *   file:     音频文件（必须）
  *   model:    模型名（可选，默认 whisper-1）
  *   language: 语言代码（可选，如 "en"）
@@ -25,13 +28,6 @@ export function OPTIONS() {
  *   response_format: 返回格式 json/text/srt/verbose_json/vtt（可选）
  */
 export async function POST(req: Request) {
-  let config;
-  try {
-    config = getOpenAIConfig();
-  } catch {
-    return errorJson("服务端 AI 未配置", 500);
-  }
-
   let formData: FormData;
   try {
     formData = await req.formData();
@@ -49,10 +45,101 @@ export async function POST(req: Request) {
     return errorJson("音频文件不能超过 25MB", 400);
   }
 
+  const provider = formData.get("provider") || "openai";
+  if (provider === "aliyun") {
+    let config;
+    try {
+      config = getSpeechRecognitionProviderConfig(provider);
+    } catch {
+      return errorJson("服务端语音识别未配置", 500);
+    }
+
+    try {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const mimeType = file.type || "audio/webm";
+      const audioUrl = `data:${mimeType};base64,${buffer.toString("base64")}`;
+      const prompt = String(formData.get("prompt") || "").trim();
+      const language = String(formData.get("language") || "").trim();
+      const model = String(formData.get("model") || config.defaultModel);
+      const dashScopeBaseUrl = config.baseUrl
+        .replace(/\/compatible-mode\/v1$/, "/api/v1")
+        .replace(/\/+$/, "");
+      const asrOptions = {
+        enable_itn: true,
+        ...(language ? { language } : {}),
+      };
+      const messages = [
+        {
+          role: "user",
+          content: [{ audio: audioUrl }],
+        },
+      ];
+      console.log("aliyun transcription request:", {
+        model,
+        prompt,
+        language: language || undefined,
+        asrOptions,
+        audio: {
+          mimeType,
+          size: file.size,
+          base64Length: audioUrl.length,
+        },
+      });
+      const upstream = await fetch(`${dashScopeBaseUrl}/services/aigc/multimodal-generation/generation`, {
+        method: "POST",
+        headers: upstreamHeaders(config.apiKey, { "Content-Type": "application/json" }),
+        body: JSON.stringify({
+          model,
+          input: {
+            messages,
+          },
+          parameters: {
+            asr_options: asrOptions,
+          },
+        }),
+      });
+
+      const data = await upstream.json().catch(() => null);
+      console.log("aliyun transcription response:", {
+        status: upstream.status,
+        ok: upstream.ok,
+        requestId: data?.request_id || data?.id,
+        code: data?.code || data?.error?.code,
+        message: data?.message || data?.error?.message,
+        output: data?.output,
+        choices: data?.choices,
+      });
+      if (!upstream.ok) {
+        console.error("aliyun transcription upstream error:", upstream.status, data);
+        return errorJson(
+          `阿里云语音识别 API 错误 (${upstream.status})`,
+          upstream.status >= 400 && upstream.status < 500 ? upstream.status : 502,
+        );
+      }
+
+      const content = data?.output?.choices?.[0]?.message?.content;
+      const text = Array.isArray(content)
+        ? content.map((item) => item?.text || "").join("").trim()
+        : String(data?.output?.text || data?.choices?.[0]?.message?.content || "").trim();
+      return Response.json({ text }, { headers: CORS_HEADERS });
+    } catch (err) {
+      console.error("aliyun transcription error:", err);
+      return errorJson(describeFetchError(err, "阿里云语音识别"), 502);
+    }
+  }
+
+  let config;
+  try {
+    config = getOpenAIConfig();
+  } catch {
+    return errorJson("服务端 AI 未配置", 500);
+  }
+
   // 补默认 model
   if (!formData.get("model")) {
     formData.set("model", DEFAULT_STT_MODEL);
   }
+  formData.delete("provider");
 
   try {
     const upstream = await fetch(`${config.baseUrl}/audio/transcriptions`, {

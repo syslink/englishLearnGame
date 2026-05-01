@@ -11,8 +11,13 @@ import type {
   CloudProviderId,
   GameSpeechEngine,
   OpenAiTtsVoice,
+  AiRegionMode,
+  SpeechRecognitionProviderConfig,
+  SpeechRecognitionProviderId,
   SpellChallengeMode,
   StudyBatchRecord,
+  VoiceProviderConfig,
+  VoiceProviderId,
 } from "./types";
 
 type LlmStatus = "idle" | "loading" | "ready" | "error";
@@ -161,21 +166,29 @@ export function LexiconAndStartPanel({
   llmTopic,
   llmGenerating,
   lexiconNormalizing,
+  voiceProviders,
+  voiceProviderId,
   openAiSpeechVoice,
   openAiSpeechVoices,
+  minimaxSpeechVoice,
+  aliyunSpeechVoice,
   openAiSpeechSpeed,
   explainingWordKey,
   timeBoost,
   roundSeconds,
   planeDropChineseOnly,
   gameSpeechEngine,
+  speechMatchThreshold,
   spellChallengeMode,
   onWordInputChange,
   onLoadScenario,
   onLlmTopicChange,
   onGenerateWordsWithLlm,
   onNormalizeLexiconWithAi,
+  onVoiceProviderChange,
   onOpenAiSpeechVoiceChange,
+  onMinimaxSpeechVoiceChange,
+  onAliyunSpeechVoiceChange,
   onOpenAiSpeechSpeedChange,
   onSpeakText,
   onExplainWord,
@@ -185,6 +198,7 @@ export function LexiconAndStartPanel({
   onRoundSecondsChange,
   onPlaneDropChineseOnlyChange,
   onGameSpeechEngineChange,
+  onSpeechMatchThresholdChange,
   onSpellChallengeModeChange,
 }: {
   scenarios: ScenarioItem[];
@@ -198,21 +212,29 @@ export function LexiconAndStartPanel({
   llmTopic: string;
   llmGenerating: boolean;
   lexiconNormalizing: boolean;
+  voiceProviders: VoiceProviderConfig[];
+  voiceProviderId: VoiceProviderId;
   openAiSpeechVoice: OpenAiTtsVoice;
   openAiSpeechVoices: readonly OpenAiTtsVoice[];
+  minimaxSpeechVoice: string;
+  aliyunSpeechVoice: string;
   openAiSpeechSpeed: number;
   explainingWordKey: string | null;
   timeBoost: number;
   roundSeconds: string;
   planeDropChineseOnly: boolean;
   gameSpeechEngine: GameSpeechEngine;
+  speechMatchThreshold: number;
   spellChallengeMode: SpellChallengeMode;
   onWordInputChange: (value: string) => void;
   onLoadScenario: (scenarioId: number) => void;
   onLlmTopicChange: (value: string) => void;
   onGenerateWordsWithLlm: () => void;
   onNormalizeLexiconWithAi: () => void;
+  onVoiceProviderChange: (providerId: VoiceProviderId) => void;
   onOpenAiSpeechVoiceChange: (voice: OpenAiTtsVoice) => void;
+  onMinimaxSpeechVoiceChange: (voice: string) => void;
+  onAliyunSpeechVoiceChange: (voice: string) => void;
   onOpenAiSpeechSpeedChange: (speed: number) => void;
   onSpeakText: (text: string) => void;
   onExplainWord: (item: LexiconItem) => void;
@@ -222,6 +244,7 @@ export function LexiconAndStartPanel({
   onRoundSecondsChange: (seconds: string) => void;
   onPlaneDropChineseOnlyChange: (enabled: boolean) => void;
   onGameSpeechEngineChange: (engine: GameSpeechEngine) => void;
+  onSpeechMatchThresholdChange: (threshold: number) => void;
   onSpellChallengeModeChange: (mode: SpellChallengeMode) => void;
 }) {
   return (
@@ -296,10 +319,10 @@ export function LexiconAndStartPanel({
         {lexiconLabels.length > 0 && (
           <div className="mt-3">
             <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[11px] text-indigo-200/70">共 {lexiconLabels.length} 词 · 点击用 OpenAI 发音</p>
+              <p className="text-[11px] text-indigo-200/70">共 {lexiconLabels.length} 词 · 点击用云端语音发音</p>
               <div className="flex flex-wrap items-center gap-2">
                 <label className="flex items-center gap-1.5 text-[10px] text-indigo-200/70">
-                  <span>OpenAI 语速</span>
+                  <span>语速</span>
                   <input
                     type="range"
                     min="0.5"
@@ -312,17 +335,49 @@ export function LexiconAndStartPanel({
                   <span className="w-8 text-right text-emerald-200">{openAiSpeechSpeed.toFixed(1)}x</span>
                 </label>
                 <select
-                  value={openAiSpeechVoice}
-                  onChange={(e) => onOpenAiSpeechVoiceChange(e.target.value as OpenAiTtsVoice)}
-                  className="max-w-[180px] rounded-md border border-indigo-300/25 bg-slate-900/70 px-1.5 py-0.5 text-[10px] text-white outline-none"
-                  title="OpenAI 内置发音人"
+                  value={voiceProviderId}
+                  onChange={(e) => onVoiceProviderChange(e.target.value as VoiceProviderId)}
+                  className="max-w-[120px] rounded-md border border-indigo-300/25 bg-slate-900/70 px-1.5 py-0.5 text-[10px] text-white outline-none"
+                  title="云端语音供应商"
                 >
-                  {openAiSpeechVoices.map((voice) => (
-                    <option key={voice} value={voice}>
-                      {voice}
+                  {voiceProviders.map((provider) => (
+                    <option key={provider.id} value={provider.id}>
+                      {provider.label}
                     </option>
                   ))}
                 </select>
+                {voiceProviderId === "openai" ? (
+                  <select
+                    value={openAiSpeechVoice}
+                    onChange={(e) => onOpenAiSpeechVoiceChange(e.target.value as OpenAiTtsVoice)}
+                    className="max-w-[180px] rounded-md border border-indigo-300/25 bg-slate-900/70 px-1.5 py-0.5 text-[10px] text-white outline-none"
+                    title="OpenAI 内置发音人"
+                  >
+                    {openAiSpeechVoices.map((voice) => (
+                      <option key={voice} value={voice}>
+                        {voice}
+                      </option>
+                    ))}
+                  </select>
+                ) : voiceProviderId === "minimax" ? (
+                  <input
+                    type="text"
+                    value={minimaxSpeechVoice}
+                    onChange={(e) => onMinimaxSpeechVoiceChange(e.target.value)}
+                    placeholder="MiniMax voice_id"
+                    className="w-32 rounded-md border border-indigo-300/25 bg-slate-900/70 px-1.5 py-0.5 text-[10px] text-white outline-none placeholder-indigo-200/35"
+                    title="MiniMax voice_id"
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    value={aliyunSpeechVoice}
+                    onChange={(e) => onAliyunSpeechVoiceChange(e.target.value)}
+                    placeholder="阿里云 voice"
+                    className="w-32 rounded-md border border-indigo-300/25 bg-slate-900/70 px-1.5 py-0.5 text-[10px] text-white outline-none placeholder-indigo-200/35"
+                    title="阿里云百炼 CosyVoice 音色"
+                  />
+                )}
               </div>
             </div>
             <div className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto pr-1">
@@ -409,6 +464,11 @@ export function LexiconAndStartPanel({
                     title: "OpenAI 识别",
                     desc: "转写后匹配近音候选，提高命中率",
                   },
+                  {
+                    id: "aliyun" as GameSpeechEngine,
+                    title: "阿里云识别",
+                    desc: "国内网络更稳定，适合大陆模式",
+                  },
                 ].map((engine) => (
                   <button
                     key={engine.id}
@@ -426,6 +486,25 @@ export function LexiconAndStartPanel({
                   </button>
                 ))}
               </div>
+              <label className="mt-3 block rounded-lg border border-cyan-300/15 bg-slate-950/35 px-3 py-2">
+                <div className="mb-1.5 flex items-center justify-between gap-2 text-xs text-cyan-100/90">
+                  <span className="font-semibold">语音匹配相似度</span>
+                  <span className="font-bold text-emerald-200">{Math.round(speechMatchThreshold * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="0.95"
+                  step="0.01"
+                  value={speechMatchThreshold}
+                  onChange={(e) => onSpeechMatchThresholdChange(Number(e.target.value))}
+                  disabled={gameState === "running"}
+                  className="h-1.5 w-full accent-emerald-400 disabled:opacity-60"
+                />
+                <p className="mt-1 text-[10px] text-indigo-100/55">
+                  越高越严格，默认 70%。包含完整单词时仍会直接匹配。
+                </p>
+              </label>
             </div>
           )}
           {playMode === "spell_word" && (
@@ -471,7 +550,7 @@ export function LexiconAndStartPanel({
             )}
             {playMode === "plane_shooter" && (
               <>
-                <p>· 按住空格说英文锁定红色目标</p>
+                <p>· 游戏中会自动识别语音，直接说英文锁定红色目标</p>
                 <p>· 左右方向键移动，上键发射子弹</p>
               </>
             )}
@@ -646,13 +725,21 @@ export function LlmSettingsPanel({
   llmAvailableModels,
   filteredLlmModels,
   selectedModelCached,
+  aiRegionMode,
   cloudProviders,
   cloudProviderId,
+  voiceProviders,
+  voiceProviderId,
+  speechRecognitionProviders,
+  speechRecognitionProviderId,
   onDropdownOpenChange,
   onModelFilterChange,
   onModelChange,
   onLoadModel,
+  onAiRegionModeChange,
   onCloudProviderChange,
+  onVoiceProviderChange,
+  onSpeechRecognitionProviderChange,
 }: {
   dropdownRef: RefObject<HTMLDivElement | null>;
   llmDropdownOpen: boolean;
@@ -663,16 +750,29 @@ export function LlmSettingsPanel({
   llmAvailableModels: LlmModelOption[];
   filteredLlmModels: LlmModelOption[];
   selectedModelCached?: boolean;
+  aiRegionMode: AiRegionMode;
   cloudProviders: CloudProviderConfig[];
   cloudProviderId: CloudProviderId;
+  voiceProviders: VoiceProviderConfig[];
+  voiceProviderId: VoiceProviderId;
+  speechRecognitionProviders: SpeechRecognitionProviderConfig[];
+  speechRecognitionProviderId: SpeechRecognitionProviderId;
   onDropdownOpenChange: (open: boolean) => void;
   onModelFilterChange: (filter: string) => void;
   onModelChange: (modelId: string) => void;
   onLoadModel: () => void;
+  onAiRegionModeChange: (mode: AiRegionMode) => void;
   onCloudProviderChange: (providerId: CloudProviderId) => void;
+  onVoiceProviderChange: (providerId: VoiceProviderId) => void;
+  onSpeechRecognitionProviderChange: (providerId: SpeechRecognitionProviderId) => void;
 }) {
   const selectedCloudProvider =
     cloudProviders.find((provider) => provider.id === cloudProviderId) || cloudProviders[0];
+  const selectedVoiceProvider =
+    voiceProviders.find((provider) => provider.id === voiceProviderId) || voiceProviders[0];
+  const selectedSpeechRecognitionProvider =
+    speechRecognitionProviders.find((provider) => provider.id === speechRecognitionProviderId) ||
+    speechRecognitionProviders[0];
 
   return (
     <section className="space-y-3">
@@ -681,13 +781,25 @@ export function LlmSettingsPanel({
           <span className="flex items-center gap-2">
             <span>☁️</span>
             <span>云端大模型设置</span>
-            <span className="text-[10px] font-normal text-sky-300/60">OpenAI · DeepSeek</span>
+            <span className="text-[10px] font-normal text-sky-300/60">文本 / 语音分开配置</span>
           </span>
           <span className="text-sky-300/60 transition group-open:rotate-180">▾</span>
         </summary>
         <div className="mt-3 flex flex-wrap items-end gap-3 text-xs">
           <label className="block">
-            <span className="mb-1 block text-sky-100/75">供应商</span>
+            <span className="mb-1 block text-sky-100/75">访问模式</span>
+            <select
+              value={aiRegionMode}
+              onChange={(e) => onAiRegionModeChange(e.target.value as AiRegionMode)}
+              className="w-full rounded-lg border border-sky-300/30 bg-slate-900/80 px-2 py-1.5 text-sm text-white outline-none focus:border-sky-300"
+            >
+              <option value="global">国际模式</option>
+              <option value="china">中国大陆模式</option>
+              <option value="manual">手动选择</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sky-100/75">文本模型</span>
             <select
               value={cloudProviderId}
               onChange={(e) => onCloudProviderChange(e.target.value as CloudProviderId)}
@@ -706,6 +818,48 @@ export function LlmSettingsPanel({
               : "border-amber-400/40 bg-amber-500/10 text-amber-200"
           }`}>
             {selectedCloudProvider?.configured ? "可用" : "未配置"}
+          </span>
+          <label className="block">
+            <span className="mb-1 block text-sky-100/75">语音模型</span>
+            <select
+              value={voiceProviderId}
+              onChange={(e) => onVoiceProviderChange(e.target.value as VoiceProviderId)}
+              className="w-full rounded-lg border border-sky-300/30 bg-slate-900/80 px-2 py-1.5 text-sm text-white outline-none focus:border-sky-300"
+            >
+              {voiceProviders.map((provider) => (
+                <option key={provider.id} value={provider.id}>
+                  {provider.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <span className={`inline-flex w-fit shrink-0 rounded-full border px-2 py-1 text-[11px] ${
+            selectedVoiceProvider?.configured
+              ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
+              : "border-amber-400/40 bg-amber-500/10 text-amber-200"
+          }`}>
+            {selectedVoiceProvider?.configured ? "可用" : "未配置"}
+          </span>
+          <label className="block">
+            <span className="mb-1 block text-sky-100/75">语音识别</span>
+            <select
+              value={speechRecognitionProviderId}
+              onChange={(e) => onSpeechRecognitionProviderChange(e.target.value as SpeechRecognitionProviderId)}
+              className="w-full rounded-lg border border-sky-300/30 bg-slate-900/80 px-2 py-1.5 text-sm text-white outline-none focus:border-sky-300"
+            >
+              {speechRecognitionProviders.map((provider) => (
+                <option key={provider.id} value={provider.id}>
+                  {provider.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <span className={`inline-flex w-fit shrink-0 rounded-full border px-2 py-1 text-[11px] ${
+            selectedSpeechRecognitionProvider?.configured
+              ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
+              : "border-amber-400/40 bg-amber-500/10 text-amber-200"
+          }`}>
+            {selectedSpeechRecognitionProvider?.configured ? "可用" : "未配置"}
           </span>
         </div>
       </details>

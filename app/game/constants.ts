@@ -1,5 +1,5 @@
 import categoriesData from "../categories.json";
-import type { OpenAiTtsVoice, ScenarioItem } from "./types";
+import type { OpenAiTtsVoice, ScenarioItem, VoiceProviderId } from "./types";
 
 export const SCENARIOS: ScenarioItem[] = categoriesData.scenarios;
 
@@ -22,3 +22,9 @@ export const OPENAI_TTS_VOICES = [
   "marin",
   "cedar",
 ] as const satisfies readonly OpenAiTtsVoice[];
+
+export const VOICE_PROVIDER_LABELS: Record<VoiceProviderId, string> = {
+  openai: "OpenAI",
+  minimax: "MiniMax",
+  aliyun: "阿里云百炼",
+};

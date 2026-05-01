@@ -60,7 +60,7 @@ export type StudyBatchRecord = {
 export type GameState = "idle" | "running" | "ended";
 export type PlayMode = "voice_match" | "plane_shooter" | "spell_word";
 export type SpellChallengeMode = "shuffle" | "missing_letters";
-export type GameSpeechEngine = "browser" | "openai";
+export type GameSpeechEngine = "browser" | "openai" | "aliyun";
 export type OpenAiTtsVoice =
   | "alloy"
   | "ash"
@@ -91,10 +91,30 @@ export type RobotChatMessage = {
   content: string;
 };
 
-export type CloudProviderId = "openai" | "deepseek";
+export type CloudProviderId = "openai" | "deepseek" | "aliyun";
+export type VoiceProviderId = "openai" | "minimax" | "aliyun";
+export type SpeechRecognitionProviderId = "openai" | "aliyun";
+export type AiRegionMode = "global" | "china" | "manual";
 
 export type CloudProviderConfig = {
   id: CloudProviderId;
+  label: string;
+  configured: boolean;
+  baseUrl: string;
+  defaultModel: string;
+};
+
+export type VoiceProviderConfig = {
+  id: VoiceProviderId;
+  label: string;
+  configured: boolean;
+  baseUrl: string;
+  defaultModel: string;
+  defaultVoice: string;
+};
+
+export type SpeechRecognitionProviderConfig = {
+  id: SpeechRecognitionProviderId;
   label: string;
   configured: boolean;
   baseUrl: string;

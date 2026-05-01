@@ -18,8 +18,10 @@ import {
   SCENARIOS,
   STUDY_BATCH_STORAGE_KEY,
   STUDY_HISTORY_STORAGE_KEY,
+  VOICE_PROVIDER_LABELS,
 } from "./game/constants";
 import type {
+  AiRegionMode,
   Bullet,
   CloudProviderConfig,
   CloudProviderId,
@@ -31,9 +33,13 @@ import type {
   OpenAiTtsVoice,
   PlayMode,
   RobotChatMessage,
+  SpeechRecognitionProviderConfig,
+  SpeechRecognitionProviderId,
   SpellChallengeMode,
   StudyBatchRecord,
   StudyHistoryRecord,
+  VoiceProviderConfig,
+  VoiceProviderId,
   WordItem,
 } from "./game/types";
 import type { SpeechRecognitionLike } from "./game/speechTypes";
@@ -49,7 +55,7 @@ import {
   shuffleString,
   similarity,
 } from "./game/wordUtils";
-import { getOpenAiSpeechBlob } from "./game/ttsCache";
+import { getCloudSpeechBlob } from "./game/ttsCache";
 import {
   getExplanationCacheKey,
   readCachedExplanation,
@@ -145,6 +151,8 @@ export default function HomePage() {
   const [fallHeightPx] = useState(600);
   const [planeDropChineseOnly, setPlaneDropChineseOnly] = useState(false);
   const [gameSpeechEngine, setGameSpeechEngine] = useState<GameSpeechEngine>("browser");
+  const [speechMatchThreshold, setSpeechMatchThreshold] = useState(0.7);
+  const [aiRegionMode, setAiRegionMode] = useState<AiRegionMode>("global");
   const [totalCount, setTotalCount] = useState(0);
   const [doneCount, setDoneCount] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
@@ -160,6 +168,11 @@ export default function HomePage() {
   const [ttsVoices, setTtsVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedVoiceURI, setSelectedVoiceURI] = useState("");
   const [openAiSpeechVoice, setOpenAiSpeechVoice] = useState<OpenAiTtsVoice>("marin");
+  const [minimaxSpeechVoice, setMinimaxSpeechVoice] = useState("male-qn-qingse");
+  const [aliyunSpeechVoice, setAliyunSpeechVoice] = useState("longxiaochun_v2");
+  const [voiceProviderId, setVoiceProviderId] = useState<VoiceProviderId>("openai");
+  const [speechRecognitionProviderId, setSpeechRecognitionProviderId] =
+    useState<SpeechRecognitionProviderId>("openai");
   const [openAiSpeechSpeed, setOpenAiSpeechSpeed] = useState(0.9);
   const [spellChallengeMode, setSpellChallengeMode] = useState<SpellChallengeMode>("shuffle");
   const [planeX, setPlaneX] = useState(240);
@@ -214,6 +227,56 @@ export default function HomePage() {
       configured: false,
       baseUrl: "https://api.deepseek.com/v1",
       defaultModel: "deepseek-chat",
+    },
+    {
+      id: "aliyun",
+      label: "阿里云百炼",
+      configured: false,
+      baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      defaultModel: "qwen-plus",
+    },
+  ]);
+  const [speechRecognitionProviders, setSpeechRecognitionProviders] =
+    useState<SpeechRecognitionProviderConfig[]>([
+      {
+        id: "openai",
+        label: "OpenAI",
+        configured: false,
+        baseUrl: "https://api.openai.com/v1",
+        defaultModel: "whisper-1",
+      },
+      {
+        id: "aliyun",
+        label: "阿里云百炼",
+        configured: false,
+        baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        defaultModel: "qwen3-asr-flash",
+      },
+    ]);
+  const [voiceProviders, setVoiceProviders] = useState<VoiceProviderConfig[]>([
+    {
+      id: "openai",
+      label: "OpenAI",
+      configured: false,
+      baseUrl: "https://api.openai.com/v1",
+      defaultModel: "gpt-4o-mini-tts",
+      defaultVoice: "marin",
+    },
+    {
+      id: "minimax",
+      label: "MiniMax",
+      configured: false,
+      baseUrl: "https://api.minimax.io/v1",
+      defaultModel: "speech-2.8-turbo",
+      defaultVoice: "male-qn-qingse",
+    },
+    {
+      id: "aliyun",
+      label: "阿里云百炼",
+      configured: false,
+      baseUrl: "https://dashscope.aliyuncs.com/api/v1",
+      defaultModel: "cosyvoice-v2",
+      defaultVoice: "longxiaochun_v2",
     },
   ]);
   const [cloudProviderId, setCloudProviderId] = useState<CloudProviderId>("openai");
@@ -331,6 +394,38 @@ export default function HomePage() {
     () => cloudProviders.find((provider) => provider.id === cloudProviderId) || cloudProviders[0],
     [cloudProviderId, cloudProviders],
   );
+  const selectedVoiceProvider = useMemo(
+    () => voiceProviders.find((provider) => provider.id === voiceProviderId) || voiceProviders[0],
+    [voiceProviderId, voiceProviders],
+  );
+  const speechVoice =
+    voiceProviderId === "minimax"
+      ? minimaxSpeechVoice.trim()
+      : voiceProviderId === "aliyun"
+        ? aliyunSpeechVoice.trim()
+        : openAiSpeechVoice;
+  const speechProviderLabel = VOICE_PROVIDER_LABELS[voiceProviderId] || selectedVoiceProvider?.label || "云端语音";
+  const applyAiRegionMode = useCallback((mode: AiRegionMode) => {
+    setAiRegionMode(mode);
+    if (mode === "global") {
+      setCloudProviderId("openai");
+      setCloudModel(cloudProviders.find((provider) => provider.id === "openai")?.defaultModel || "gpt-4o-mini");
+      setVoiceProviderId("openai");
+      setSpeechRecognitionProviderId("openai");
+      setGameSpeechEngine("browser");
+      gameSpeechEngineRef.current = "browser";
+      return;
+    }
+    if (mode === "china") {
+      const aliyunText = cloudProviders.find((provider) => provider.id === "aliyun");
+      setCloudProviderId("aliyun");
+      setCloudModel(aliyunText?.defaultModel || "qwen-plus");
+      setVoiceProviderId("aliyun");
+      setSpeechRecognitionProviderId("aliyun");
+      setGameSpeechEngine("aliyun");
+      gameSpeechEngineRef.current = "aliyun";
+    }
+  }, [cloudProviders]);
   const currentSpellTarget = useMemo(
     () => words.find((word) => word.id === spellTargetId && word.status === "live") || null,
     [spellTargetId, words],
@@ -436,22 +531,54 @@ export default function HomePage() {
     }
   }, []);
 
-  // 读取服务端可用的云端大模型配置。API Key 不会返回到浏览器。
+  // 读取服务端可用的云端文本/语音模型配置。API Key 不会返回到浏览器。
   useEffect(() => {
     let cancelled = false;
     fetch("/api/v1/cloud-config")
       .then((resp) => resp.json())
-      .then((data: { providers?: CloudProviderConfig[] }) => {
-        if (cancelled || !Array.isArray(data.providers)) return;
-        setCloudProviders(data.providers);
+      .then((data: {
+        providers?: CloudProviderConfig[];
+        textProviders?: CloudProviderConfig[];
+        voiceProviders?: VoiceProviderConfig[];
+        speechRecognitionProviders?: SpeechRecognitionProviderConfig[];
+      }) => {
+        if (cancelled) return;
+        const textProviders = Array.isArray(data.textProviders)
+          ? data.textProviders
+          : Array.isArray(data.providers)
+            ? data.providers
+            : null;
+        if (textProviders) {
+          setCloudProviders(textProviders);
+          const preferred =
+            textProviders.find((provider) => provider.id === cloudProviderId && provider.configured) ||
+            textProviders.find((provider) => provider.configured) ||
+            textProviders.find((provider) => provider.id === cloudProviderId) ||
+            textProviders[0];
+          if (preferred) {
+            setCloudProviderId(preferred.id);
+            setCloudModel(preferred.defaultModel);
+          }
+        }
+        if (!Array.isArray(data.voiceProviders)) return;
+        setVoiceProviders(data.voiceProviders);
         const preferred =
-          data.providers.find((provider) => provider.id === cloudProviderId && provider.configured) ||
-          data.providers.find((provider) => provider.configured) ||
-          data.providers.find((provider) => provider.id === cloudProviderId) ||
-          data.providers[0];
+          data.voiceProviders.find((provider) => provider.id === voiceProviderId && provider.configured) ||
+          data.voiceProviders.find((provider) => provider.configured) ||
+          data.voiceProviders.find((provider) => provider.id === voiceProviderId) ||
+          data.voiceProviders[0];
         if (preferred) {
-          setCloudProviderId(preferred.id);
-          setCloudModel(preferred.defaultModel);
+          setVoiceProviderId(preferred.id);
+          if (preferred.id === "openai") {
+            setOpenAiSpeechVoice((preferred.defaultVoice || "marin") as OpenAiTtsVoice);
+          } else if (preferred.id === "minimax") {
+            setMinimaxSpeechVoice(preferred.defaultVoice || "male-qn-qingse");
+          } else {
+            setAliyunSpeechVoice(preferred.defaultVoice || "longxiaochun_v2");
+          }
+        }
+        if (Array.isArray(data.speechRecognitionProviders)) {
+          setSpeechRecognitionProviders(data.speechRecognitionProviders);
         }
       })
       .catch(() => {
@@ -722,14 +849,15 @@ export default function HomePage() {
     robotPlaybackSessionRef.current += 1;
     cleanupOpenAiAudio();
     setRobotVoiceWave((prev) => ({ ...prev, active: false, speaking: false }));
-    setFeedbackText(`正在通过 OpenAI 合成发音：${input}`);
+    const voice = speechVoice || selectedVoiceProvider?.defaultVoice || "marin";
+    setFeedbackText(`正在通过 ${speechProviderLabel} 合成发音：${input}`);
 
     try {
-      const { blob, fromCache } = await getOpenAiSpeechBlob(input, openAiSpeechSpeed, openAiSpeechVoice);
+      const { blob, fromCache } = await getCloudSpeechBlob(input, openAiSpeechSpeed, voice, voiceProviderId);
       setFeedbackText(
         fromCache
-          ? `正在播放本地缓存发音：${input}（${openAiSpeechVoice} · ${openAiSpeechSpeed.toFixed(1)}x）`
-          : `OpenAI 发音已缓存：${input}（${openAiSpeechVoice} · ${openAiSpeechSpeed.toFixed(1)}x）`,
+          ? `正在播放本地缓存发音：${input}（${speechProviderLabel} · ${voice} · ${openAiSpeechSpeed.toFixed(1)}x）`
+          : `${speechProviderLabel} 发音已缓存：${input}（${voice} · ${openAiSpeechSpeed.toFixed(1)}x）`,
       );
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
@@ -738,15 +866,22 @@ export default function HomePage() {
       audio.onended = cleanupOpenAiAudio;
       audio.onerror = () => {
         cleanupOpenAiAudio();
-        setFeedbackText("OpenAI 发音播放失败，请稍后重试");
+        setFeedbackText("云端发音播放失败，请稍后重试");
       };
       await audio.play();
     } catch (err) {
       cleanupOpenAiAudio();
-      setFeedbackText(`OpenAI 发音失败：${(err as Error).message || "请检查服务端配置"}`);
-      console.error("OpenAI speech playback failed:", err);
+      setFeedbackText(`云端发音失败：${(err as Error).message || "请检查服务端配置"}`);
+      console.error("cloud speech playback failed:", err);
     }
-  }, [cleanupOpenAiAudio, openAiSpeechSpeed, openAiSpeechVoice]);
+  }, [
+    cleanupOpenAiAudio,
+    openAiSpeechSpeed,
+    selectedVoiceProvider?.defaultVoice,
+    speechProviderLabel,
+    speechVoice,
+    voiceProviderId,
+  ]);
 
   const playSpeechBlob = useCallback((
     blob: Blob,
@@ -842,7 +977,8 @@ export default function HomePage() {
     robotStopRequestedRef.current = false;
     robotSegmentsRef.current = segments;
 
-    let nextAudio = getOpenAiSpeechBlob(segments[0], openAiSpeechSpeed, openAiSpeechVoice);
+    const voice = speechVoice || selectedVoiceProvider?.defaultVoice || "marin";
+    let nextAudio = getCloudSpeechBlob(segments[0], openAiSpeechSpeed, voice, voiceProviderId);
     const retryCounts = new Map<number, number>();
     let i = 0;
     for (; i < segments.length;) {
@@ -854,14 +990,14 @@ export default function HomePage() {
         i = Math.max(0, Math.min(segments.length - 1, rawIndex));
         startRatio = ((seekRequest.percent / 100) * segments.length) - i;
         robotSeekRequestRef.current = null;
-        nextAudio = getOpenAiSpeechBlob(segments[i], openAiSpeechSpeed, openAiSpeechVoice);
+        nextAudio = getCloudSpeechBlob(segments[i], openAiSpeechSpeed, voice, voiceProviderId);
       }
 
       const current = await nextAudio;
       if (robotPlaybackSessionRef.current !== sessionId || robotStopRequestedRef.current) break;
       nextAudio =
         i + 1 < segments.length
-          ? getOpenAiSpeechBlob(segments[i + 1], openAiSpeechSpeed, openAiSpeechVoice)
+          ? getCloudSpeechBlob(segments[i + 1], openAiSpeechSpeed, voice, voiceProviderId)
           : Promise.resolve(current);
       setRobotVoiceWave((prev) => ({
         ...prev,
@@ -918,7 +1054,13 @@ export default function HomePage() {
       }));
       setFeedbackText(completeText);
     }
-  }, [openAiSpeechSpeed, openAiSpeechVoice, playSpeechBlob]);
+  }, [
+    openAiSpeechSpeed,
+    playSpeechBlob,
+    selectedVoiceProvider?.defaultVoice,
+    speechVoice,
+    voiceProviderId,
+  ]);
 
   const seekRobotVoiceWave = useCallback((percent: number) => {
     const segments = robotSegmentsRef.current;
@@ -1224,6 +1366,7 @@ export default function HomePage() {
       .join("\n");
     const formData = new FormData();
     formData.set("file", audio, `robot-message-${Date.now()}.webm`);
+    formData.set("provider", speechRecognitionProviderId);
     formData.set("response_format", "json");
     formData.set(
       "prompt",
@@ -1255,7 +1398,7 @@ export default function HomePage() {
 
     setFeedbackText(`识别到：${text}`);
     await askRobotTeacher(text);
-  }, [askRobotTeacher, cleanupOpenAiAudio]);
+  }, [askRobotTeacher, cleanupOpenAiAudio, speechRecognitionProviderId]);
 
   const lockPlaneTarget = useCallback((target: WordItem) => {
     setWords((prev) => {
@@ -1321,7 +1464,7 @@ export default function HomePage() {
 
     const currentTargetId = planeTargetIdRef.current;
     if (!currentTargetId) {
-      setFeedbackText("请先按住空格说出单词，锁定红色目标");
+      setFeedbackText("请直接说出下落单词，语音识别会自动锁定红色目标");
       return;
     }
     const targetAlive = wordsRef.current.some(
@@ -1666,12 +1809,12 @@ export default function HomePage() {
           return;
         }
 
-        if (bestShooter.score >= 0.58) {
+        if (bestShooter.score >= speechMatchThreshold) {
           lockPlaneTarget(bestShooter.word);
           return;
         }
 
-        setFeedbackText(`未匹配到下落词，最接近：${bestShooter.word.en}`);
+        setFeedbackText(`未匹配到下落词，最接近：${bestShooter.word.en}（${Math.round(bestShooter.score * 100)}%）`);
         return;
       }
 
@@ -1695,11 +1838,11 @@ export default function HomePage() {
       }
 
       const matchedWord =
-        containsCandidate || (best && best.score >= 0.58 ? best.word : null);
+        containsCandidate || (best && best.score >= speechMatchThreshold ? best.word : null);
 
       if (!matchedWord) {
         if (best) {
-          setFeedbackText(`未识别到有效词，最接近：${best.word.en}`);
+          setFeedbackText(`未识别到有效词，最接近：${best.word.en}（${Math.round(best.score * 100)}%）`);
         }
         return;
       }
@@ -1710,7 +1853,7 @@ export default function HomePage() {
         setFeedbackText(`你说的是 "${matchedWord.en}"，本题目标是 "${target.en}"`);
       }
     },
-    [lockPlaneTarget, playMode, resolveRound, setSpellInput],
+    [lockPlaneTarget, playMode, resolveRound, setSpellInput, speechMatchThreshold],
   );
 
   // ---- WebLLM: 加载模型 ----
@@ -1940,13 +2083,12 @@ export default function HomePage() {
     wordInput,
   ]);
 
-  const getOpenAiPronunciationCandidates = useCallback(async (transcript: string) => {
+  const getPronunciationCandidates = useCallback(async (transcript: string) => {
     const liveWords = wordsRef.current
       .filter((word) => word.status === "live")
       .map((word) => word.en);
     if (!liveWords.length) return [];
 
-    const openAiProvider = cloudProviders.find((provider) => provider.id === "openai");
     const messages = [
       {
         role: "system",
@@ -1963,8 +2105,8 @@ export default function HomePage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        provider: "openai",
-        model: openAiProvider?.defaultModel || "gpt-4o-mini",
+        provider: selectedCloudProvider?.id || "openai",
+        model: selectedCloudProvider?.defaultModel || "gpt-4o-mini",
         messages,
         temperature: 0.1,
         max_tokens: 160,
@@ -1972,22 +2114,23 @@ export default function HomePage() {
     });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) {
-      throw new Error(data?.error?.message || `OpenAI 候选词匹配失败 (${resp.status})`);
+      throw new Error(data?.error?.message || `候选词匹配失败 (${resp.status})`);
     }
     const allowed = new Set(liveWords.map((word) => normalizeText(word)));
     return String(data.choices?.[0]?.message?.content || "")
       .split("\n")
       .map((line) => line.replace(/^[-*\d\.\)\s]+/, "").trim())
       .filter((line) => allowed.has(normalizeText(line)));
-  }, [cloudProviders]);
+  }, [selectedCloudProvider]);
 
-  const transcribeGameSpeechWithOpenAi = useCallback(async (blob: Blob) => {
+  const transcribeGameSpeechWithCloud = useCallback(async (blob: Blob) => {
     if (blob.size < 800) return;
     const liveWords = wordsRef.current
       .filter((word) => word.status === "live")
       .map((word) => word.en);
     const formData = new FormData();
     formData.set("file", blob, `game-speech-${Date.now()}.webm`);
+    formData.set("provider", gameSpeechEngineRef.current === "aliyun" ? "aliyun" : "openai");
     formData.set("response_format", "json");
     formData.set("language", "en");
     formData.set(
@@ -1999,26 +2142,26 @@ export default function HomePage() {
       ].join("\n"),
     );
 
-    setRecognizedText("OpenAI 正在识别...");
+    setRecognizedText(`${gameSpeechEngineRef.current === "aliyun" ? "阿里云" : "OpenAI"} 正在识别...`);
     const resp = await fetch("/api/v1/audio/transcriptions", {
       method: "POST",
       body: formData,
     });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) {
-      throw new Error(data?.error?.message || `OpenAI 语音识别失败 (${resp.status})`);
+      throw new Error(data?.error?.message || `云端语音识别失败 (${resp.status})`);
     }
 
     const transcript = String(data.text || "").trim();
     if (!transcript) return;
     let alternatives: string[] = [];
     try {
-      alternatives = await getOpenAiPronunciationCandidates(transcript);
+      alternatives = await getPronunciationCandidates(transcript);
     } catch (err) {
-      console.warn("OpenAI pronunciation candidates failed:", err);
+      console.warn("pronunciation candidates failed:", err);
     }
     tryMatchSpeech(transcript, alternatives);
-  }, [getOpenAiPronunciationCandidates, tryMatchSpeech]);
+  }, [getPronunciationCandidates, tryMatchSpeech]);
 
   const startOpenAiGameSpeech = useCallback(async () => {
     stopSpeech();
@@ -2055,14 +2198,14 @@ export default function HomePage() {
 
         if (chunks.length) {
           const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
-          void transcribeGameSpeechWithOpenAi(blob).catch((err) => {
-            console.error("OpenAI game speech failed:", err);
-            setFeedbackText(`OpenAI 语音识别失败：${(err as Error).message || "请检查服务端配置"}`);
+          void transcribeGameSpeechWithCloud(blob).catch((err) => {
+            console.error("cloud game speech failed:", err);
+            setFeedbackText(`云端语音识别失败：${(err as Error).message || "请检查服务端配置"}`);
           });
         }
 
         if (
-          gameSpeechEngineRef.current === "openai" &&
+          (gameSpeechEngineRef.current === "openai" || gameSpeechEngineRef.current === "aliyun") &&
           gameStateRef.current === "running" &&
           autoListenRef.current &&
           (playModeRef.current === "voice_match" || askingRef.current)
@@ -2074,7 +2217,8 @@ export default function HomePage() {
       };
 
       recorder.start();
-      setRecognizedText(autoListenRef.current ? "OpenAI 正在监听中..." : "OpenAI 正在录音...（松开结束）");
+      const providerLabel = gameSpeechEngineRef.current === "aliyun" ? "阿里云" : "OpenAI";
+      setRecognizedText(autoListenRef.current ? `${providerLabel} 正在监听中...` : `${providerLabel} 正在录音...`);
       if (autoListenRef.current) {
         gameSpeechRestartTimerRef.current = window.setTimeout(() => {
           if (gameSpeechRecorderRef.current?.state === "recording") {
@@ -2085,10 +2229,10 @@ export default function HomePage() {
     } catch {
       setFeedbackText("无法使用麦克风，请检查浏览器权限");
     }
-  }, [gameState, stopSpeech, transcribeGameSpeechWithOpenAi]);
+  }, [gameState, stopSpeech, transcribeGameSpeechWithCloud]);
 
   const startSpeech = useCallback(() => {
-    if (gameSpeechEngineRef.current === "openai") {
+    if (gameSpeechEngineRef.current === "openai" || gameSpeechEngineRef.current === "aliyun") {
       void startOpenAiGameSpeech();
       return;
     }
@@ -2161,7 +2305,7 @@ export default function HomePage() {
     try {
       rec.start();
       speechRef.current = rec;
-      setRecognizedText(autoListenRef.current ? "正在监听中..." : "正在监听...（按住空格）");
+      setRecognizedText("正在监听中...");
     } catch {
       setSpeechSupported(false);
     }
@@ -2404,13 +2548,13 @@ export default function HomePage() {
         ? planeDropChineseOnly
           ? "中文下落模式：看下落中文，说出对应英文"
           : "开局成功，准备进入第一题"
-        : playMode === "spell_word"
-          ? spellChallengeMode === "missing_letters"
-            ? "看单词缺失字母提示，输入缺失字母后按回车确认"
-            : "看中文提示，在键盘上拼出正确的英文单词，按回车确认"
-          : planeDropChineseOnly
-            ? "中文下落模式：按住空格说英文，目标会变红；再用左右键移动、上方向键发射"
-            : "按住空格说出单词锁定红色目标，再用左右键移动飞机、上方向键发射",
+          : playMode === "spell_word"
+            ? spellChallengeMode === "missing_letters"
+              ? "看单词缺失字母提示，输入缺失字母后按回车确认"
+              : "看中文提示，在键盘上拼出正确的英文单词，按回车确认"
+            : planeDropChineseOnly
+              ? "中文下落模式：直接说英文，目标会变红；再用左右键移动、上方向键发射"
+              : "直接说出单词锁定红色目标，再用左右键移动飞机、上方向键发射",
     );
     setRecognizedText("");
     setShooterHits(0);
@@ -2469,19 +2613,19 @@ export default function HomePage() {
       askingRef.current = true;
       targetRef.current = null;
       setTargetId(null);
-      setRecognizedText(isTouchDevice ? "正在自动监听..." : "按住空格开始监听...");
+      setRecognizedText("正在自动监听...");
       setCountdownMs(0);
     }
 
-    // 释义匹配：所有设备自动开启语音识别；其他语音模式仅触摸设备自动开启
-    if (playMode === "voice_match" || (isTouchDevice && playMode === "plane_shooter")) {
+    // 释义匹配与飞机射击都全程自动监听；拼写模式不需要语音识别。
+    if (playMode === "voice_match" || playMode === "plane_shooter") {
       autoListenRef.current = true;
       startSpeech();
     }
 
     clearRaf();
     rafRef.current = requestAnimationFrame(gameLoop);
-  }, [wordInput, playMode, fallHeightPx, addSeenHistoryBatch, registerStudyBatch, nextRound, clearRaf, gameLoop, roundSeconds, planeDropChineseOnly, spellChallengeMode, pickNextSpellTarget, isTouchDevice, startSpeech]);
+  }, [wordInput, playMode, fallHeightPx, addSeenHistoryBatch, registerStudyBatch, nextRound, clearRaf, gameLoop, roundSeconds, planeDropChineseOnly, spellChallengeMode, pickNextSpellTarget, startSpeech]);
 
   const stopGame = useCallback(() => {
     endGame();
@@ -2601,11 +2745,11 @@ export default function HomePage() {
       if (event.code !== "Space") return;
       if (event.repeat) return;
       event.preventDefault();
-      // voice_match 模式始终自动监听，不需要按空格
-      if (playMode === "voice_match") return;
+      // 释义匹配和飞机射击都始终自动监听，不需要按空格。
+      if (playMode === "voice_match" || playMode === "plane_shooter") return;
       const canListen =
         gameState === "running" &&
-        (askingRef.current && (playMode === "plane_shooter" || Boolean(targetRef.current)));
+        (askingRef.current && Boolean(targetRef.current));
       if (!canListen) return;
       spaceHoldRef.current = true;
       setIsHoldingSpace(true);
@@ -2627,13 +2771,13 @@ export default function HomePage() {
 
       if (event.code !== "Space") return;
       event.preventDefault();
-      // voice_match 模式始终自动监听，不需要按空格
-      if (playMode === "voice_match") return;
+      // 释义匹配和飞机射击都始终自动监听，不需要按空格。
+      if (playMode === "voice_match" || playMode === "plane_shooter") return;
       spaceHoldRef.current = false;
       setIsHoldingSpace(false);
       stopSpeech();
       if (gameState === "running" && askingRef.current) {
-        setRecognizedText("已停止监听（按住空格继续）");
+        setRecognizedText("已停止监听");
       }
     };
 
@@ -2710,21 +2854,32 @@ export default function HomePage() {
           llmTopic={llmTopic}
           llmGenerating={llmGenerating}
           lexiconNormalizing={lexiconNormalizing}
+          voiceProviders={voiceProviders}
+          voiceProviderId={voiceProviderId}
           openAiSpeechVoice={openAiSpeechVoice}
           openAiSpeechVoices={OPENAI_TTS_VOICES}
+          minimaxSpeechVoice={minimaxSpeechVoice}
+          aliyunSpeechVoice={aliyunSpeechVoice}
           openAiSpeechSpeed={openAiSpeechSpeed}
           explainingWordKey={explainingWordKey}
           timeBoost={timeBoost}
           roundSeconds={roundSeconds}
           planeDropChineseOnly={planeDropChineseOnly}
           gameSpeechEngine={gameSpeechEngine}
+          speechMatchThreshold={speechMatchThreshold}
           spellChallengeMode={spellChallengeMode}
           onWordInputChange={setWordInput}
           onLoadScenario={loadScenario}
           onLlmTopicChange={setLlmTopic}
           onGenerateWordsWithLlm={generateWordsWithLlm}
           onNormalizeLexiconWithAi={normalizeLexiconWithAi}
+          onVoiceProviderChange={(providerId) => {
+            setAiRegionMode("manual");
+            setVoiceProviderId(providerId);
+          }}
           onOpenAiSpeechVoiceChange={setOpenAiSpeechVoice}
+          onMinimaxSpeechVoiceChange={setMinimaxSpeechVoice}
+          onAliyunSpeechVoiceChange={setAliyunSpeechVoice}
           onOpenAiSpeechSpeedChange={setOpenAiSpeechSpeed}
           onSpeakText={speakText}
           onExplainWord={explainWord}
@@ -2734,9 +2889,14 @@ export default function HomePage() {
           onRoundSecondsChange={setRoundSeconds}
           onPlaneDropChineseOnlyChange={setPlaneDropChineseOnly}
           onGameSpeechEngineChange={(engine) => {
+            setAiRegionMode("manual");
+            if (engine === "openai" || engine === "aliyun") {
+              setSpeechRecognitionProviderId(engine);
+            }
             gameSpeechEngineRef.current = engine;
             setGameSpeechEngine(engine);
           }}
+          onSpeechMatchThresholdChange={setSpeechMatchThreshold}
           onSpellChallengeModeChange={setSpellChallengeMode}
         />
 
@@ -2761,16 +2921,33 @@ export default function HomePage() {
           llmAvailableModels={llmAvailableModels}
           filteredLlmModels={filteredLlmModels}
           selectedModelCached={selectedModelCached}
+          aiRegionMode={aiRegionMode}
           cloudProviders={cloudProviders}
           cloudProviderId={cloudProviderId}
+          voiceProviders={voiceProviders}
+          voiceProviderId={voiceProviderId}
+          speechRecognitionProviders={speechRecognitionProviders}
+          speechRecognitionProviderId={speechRecognitionProviderId}
           onDropdownOpenChange={setLlmDropdownOpen}
           onModelFilterChange={setLlmModelFilter}
           onModelChange={setLlmModelId}
           onLoadModel={loadLlmModel}
+          onAiRegionModeChange={applyAiRegionMode}
           onCloudProviderChange={(providerId) => {
+            setAiRegionMode("manual");
             setCloudProviderId(providerId);
             const provider = cloudProviders.find((item) => item.id === providerId);
             setCloudModel(provider?.defaultModel || "");
+          }}
+          onVoiceProviderChange={(providerId) => {
+            setAiRegionMode("manual");
+            setVoiceProviderId(providerId);
+          }}
+          onSpeechRecognitionProviderChange={(providerId) => {
+            setAiRegionMode("manual");
+            setSpeechRecognitionProviderId(providerId);
+            gameSpeechEngineRef.current = providerId;
+            setGameSpeechEngine(providerId);
           }}
         />
 
@@ -2790,9 +2967,7 @@ export default function HomePage() {
                           ? "用键盘拼出正确单词，按回车确认"
                           : playMode === "voice_match"
                             ? "语音识别已开启，请直接说英文"
-                            : isTouchDevice
-                              ? "游戏进行中（自动语音识别）"
-                              : "游戏进行中（按住空格可语音识别）"
+                            : "游戏进行中（自动语音识别）"
                         : "可开始新一局或查看本局成绩"}
                     </p>
                   </div>
@@ -3287,15 +3462,15 @@ export default function HomePage() {
                             </>
                           ) : playMode === "voice_match" ? (
                             <>
-                              <p className="mt-2 text-indigo-100">看到中文后，在限时内按住空格说出对应英文。</p>
+                              <p className="mt-2 text-indigo-100">看到中文后，在限时内直接说出对应英文。</p>
                               <p className="mt-1 text-indigo-100">匹配成功时单词会爆炸消失，全部完成后自动评分。</p>
                             </>
                           ) : (
                             <>
                               <p className="mt-2 text-indigo-100">
                                 {planeDropChineseOnly
-                                  ? "中文会先下落，按住空格说出对应英文后，该词会切换为英文并变成红色目标。"
-                                  : "按住空格说出下落英文，匹配后该词会变成红色目标。"}
+                                  ? "中文会先下落，直接说出对应英文后，该词会切换为英文并变成红色目标。"
+                                  : "直接说出下落英文，匹配后该词会变成红色目标。"}
                               </p>
                               <p className="mt-1 text-indigo-100">左右方向键移动飞机，上方向键发射子弹，击中红色目标才会爆炸并计分。</p>
                             </>

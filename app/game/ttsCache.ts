@@ -1,7 +1,10 @@
-const TTS_CACHE_NAME = "flyword-openai-tts-v1";
+import type { VoiceProviderId } from "./types";
+
+const TTS_CACHE_NAME = "flyword-cloud-tts-v2";
 const TTS_CACHE_PREFIX = "https://flyword.local/tts-cache/";
 
 type SpeechRequest = {
+  provider: VoiceProviderId;
   input: string;
   voice: string;
   response_format: "mp3";
@@ -12,8 +15,9 @@ function canUseCacheStorage(): boolean {
   return typeof window !== "undefined" && "caches" in window;
 }
 
-function cacheKeyForSpeech({ input, voice, response_format, speed }: SpeechRequest): string {
+function cacheKeyForSpeech({ provider, input, voice, response_format, speed }: SpeechRequest): string {
   const params = new URLSearchParams({
+    provider,
     input,
     voice,
     format: response_format,
@@ -51,12 +55,18 @@ async function writeCachedSpeech(request: SpeechRequest, blob: Blob): Promise<vo
   }
 }
 
-export async function getOpenAiSpeechBlob(input: string, speed: number, voice = "marin"): Promise<{
+export async function getCloudSpeechBlob(
+  input: string,
+  speed: number,
+  voice = "marin",
+  provider: VoiceProviderId = "openai",
+): Promise<{
   blob: Blob;
   fromCache: boolean;
 }> {
   const normalizedSpeed = Math.max(0.25, Math.min(4, Number.isFinite(speed) ? speed : 1));
   const request: SpeechRequest = {
+    provider,
     input,
     voice,
     response_format: "mp3",
@@ -75,10 +85,12 @@ export async function getOpenAiSpeechBlob(input: string, speed: number, voice = 
   });
   if (!resp.ok) {
     const data = await resp.json().catch(() => ({}));
-    throw new Error(data?.error?.message || `OpenAI 发音请求失败 (${resp.status})`);
+    throw new Error(data?.error?.message || `云端发音请求失败 (${resp.status})`);
   }
 
   const blob = await resp.blob();
   await writeCachedSpeech(request, blob);
   return { blob, fromCache: false };
 }
+
+export const getOpenAiSpeechBlob = getCloudSpeechBlob;

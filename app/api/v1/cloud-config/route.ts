@@ -1,4 +1,9 @@
-import { CORS_HEADERS, getCloudProviderSummaries } from "@/lib/openai";
+import {
+  CORS_HEADERS,
+  getCloudProviderSummaries,
+  getSpeechRecognitionProviderSummaries,
+  getVoiceProviderSummaries,
+} from "@/lib/openai";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,11 +13,16 @@ export function OPTIONS() {
 }
 
 export function GET() {
+  const textProviders = getCloudProviderSummaries();
+  const voiceProviders = getVoiceProviderSummaries();
+  const speechRecognitionProviders = getSpeechRecognitionProviderSummaries();
   return Response.json(
     {
-      providers: getCloudProviderSummaries(),
+      providers: textProviders,
+      textProviders,
+      voiceProviders,
+      speechRecognitionProviders,
     },
     { headers: CORS_HEADERS },
   );
 }
-
