@@ -58,7 +58,7 @@ export type StudyBatchRecord = {
 };
 
 export type GameState = "idle" | "running" | "ended";
-export type PlayMode = "voice_match" | "plane_shooter" | "spell_word";
+export type PlayMode = "voice_match" | "plane_shooter" | "spell_word" | "mario_gift";
 export type SpellChallengeMode = "shuffle" | "missing_letters";
 export type GameSpeechEngine = "browser" | "openai" | "aliyun";
 export type OpenAiTtsVoice =
@@ -84,7 +84,7 @@ export type Bullet = {
   targetId: string;
 };
 
-export type LexiconItem = { en: string; zh: string };
+export type LexiconItem = { en: string; zh: string; phonetic?: string };
 
 export type RobotChatMessage = {
   role: "user" | "assistant";

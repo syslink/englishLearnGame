@@ -255,6 +255,11 @@ export function describeFetchError(err: unknown, providerLabel = "上游 API"): 
   return `请求 ${providerLabel} 失败：${error?.message || "未知网络错误"}`;
 }
 
+export function openAiUserFriendlyError(detail?: string): string {
+  const suffix = detail ? `（${detail}）` : "";
+  return `当前 OpenAI 服务访问失败${suffix}。这通常是网络、代理或地区访问限制导致的。请在“云端大模型设置”中切换到中国大陆模式，或改用 DeepSeek / 阿里云模型后再试。`;
+}
+
 // 统一错误响应
 export function errorJson(message: string, status: number) {
   return Response.json(

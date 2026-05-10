@@ -1,7 +1,7 @@
 import type { CloudProviderId } from "./types";
 import { normalizeText } from "./wordUtils";
 
-const EXPLANATION_CACHE_KEY = "flyword_word_explanation_cache_v1";
+const EXPLANATION_CACHE_KEY = "flyword_word_explanation_cache_v2";
 const MAX_CACHE_ITEMS = 300;
 
 type ExplanationCacheRecord = {
@@ -73,4 +73,3 @@ export function writeCachedExplanation(key: string, explanation: string): void {
   };
   writeCache(cache);
 }
-

@@ -6,6 +6,7 @@ import {
   errorJson,
   CORS_HEADERS,
   describeFetchError,
+  openAiUserFriendlyError,
 } from "@/lib/openai";
 
 export const runtime = "nodejs";
@@ -152,7 +153,7 @@ export async function POST(req: Request) {
       const errText = await upstream.text().catch(() => "unknown error");
       console.error("transcription upstream error:", upstream.status, errText);
       return errorJson(
-        `上游 API 错误 (${upstream.status})`,
+        openAiUserFriendlyError(`语音识别接口返回 ${upstream.status}`),
         upstream.status >= 400 && upstream.status < 500 ? upstream.status : 502,
       );
     }
@@ -176,6 +177,6 @@ export async function POST(req: Request) {
     });
   } catch (err) {
     console.error("transcription error:", err);
-    return errorJson("语音识别请求失败", 502);
+    return errorJson(openAiUserFriendlyError(describeFetchError(err, "OpenAI 语音识别")), 502);
   }
 }

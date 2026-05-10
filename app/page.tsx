@@ -61,6 +61,11 @@ import {
   readCachedExplanation,
   writeCachedExplanation,
 } from "./game/wordExplanationCache";
+import {
+  getPhoneticCacheKey,
+  readCachedPhonetics,
+  writeCachedPhonetics,
+} from "./game/phoneticCache";
 
 function normalizeGameDuration(seconds: string | number): number {
   const value = typeof seconds === "string" ? Number(seconds.trim()) : seconds;
@@ -103,6 +108,16 @@ function isAudioAbortError(err: unknown): boolean {
   return err instanceof DOMException && err.name === "AbortError";
 }
 
+function formatOpenAiUserError(err: unknown): string {
+  const message = (err as Error)?.message || "服务暂时不可用";
+  if (
+    /OpenAI|api\.openai\.com|连接超时|无法连接|无法解析|上游 API|fetch|network|Failed to fetch/i.test(message)
+  ) {
+    return `当前 OpenAI 服务访问失败。可能是网络、代理或地区访问限制导致的。请在“云端大模型设置”中切换到中国大陆模式，或改用 DeepSeek / 阿里云模型后再试。`;
+  }
+  return message;
+}
+
 function getLetterIndexByTypedPosition(word: string, typedPosition: number): number {
   let count = 0;
   for (let i = 0; i < word.length; i += 1) {
@@ -140,6 +155,7 @@ export default function HomePage() {
   const roundDurationRef = useRef(ROUND_MS);
 
   const [wordInput, setWordInput] = useState("");
+  const [phoneticMap, setPhoneticMap] = useState<Record<string, string>>({});
   const [words, setWords] = useState<WordItem[]>([]);
   const [playMode, setPlayMode] = useState<PlayMode>("plane_shooter");
   const [gameState, setGameState] = useState<GameState>("idle");
@@ -160,7 +176,7 @@ export default function HomePage() {
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
   const [timeBoost, setTimeBoost] = useState(0);
-  const [, setFeedbackText] = useState("准备好开口说英语了吗？");
+  const [feedbackText, setFeedbackText] = useState("准备好开口说英语了吗？");
   const [likeBursts, setLikeBursts] = useState<LikeBurst[]>([]);
   const [mistakeMap, setMistakeMap] = useState<Record<string, MistakeRecord>>({});
   const [studyHistoryMap, setStudyHistoryMap] = useState<Record<string, StudyHistoryRecord>>({});
@@ -178,6 +194,9 @@ export default function HomePage() {
   const [planeX, setPlaneX] = useState(240);
   const [bullets, setBullets] = useState<Bullet[]>([]);
   const [shooterHits, setShooterHits] = useState(0);
+  const [marioPlayerX, setMarioPlayerX] = useState(40);
+  const [marioJumpY, setMarioJumpY] = useState(0);
+  const [marioPendingGiftId, setMarioPendingGiftId] = useState<string | null>(null);
   const [isGameModalOpen, setIsGameModalOpen] = useState(false);
   const [startAfterOpen, setStartAfterOpen] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
@@ -340,6 +359,10 @@ export default function HomePage() {
   const leftPressedRef = useRef(false);
   const rightPressedRef = useRef(false);
   const lastFireTsRef = useRef(0);
+  const marioPlayerXRef = useRef(40);
+  const marioJumpYRef = useRef(0);
+  const marioJumpVelocityRef = useRef(0);
+  const marioPendingGiftIdRef = useRef<string | null>(null);
   const fallHeightRef = useRef(600);
   const roundStartRef = useRef(0);
   const lastFrameTsRef = useRef<number | null>(null);
@@ -380,7 +403,14 @@ export default function HomePage() {
     return target?.zh || "准备下一题...";
   }, [words, targetId, gameState]);
 
-  const lexiconLabels = useMemo(() => parseLexiconEntries(wordInput), [wordInput]);
+  const lexiconLabels = useMemo(
+    () =>
+      parseLexiconEntries(wordInput).map((item) => ({
+        ...item,
+        phonetic: phoneticMap[getPhoneticCacheKey(item.en)],
+      })),
+    [phoneticMap, wordInput],
+  );
   const mistakeList = useMemo(
     () => Object.values(mistakeMap).sort((a, b) => b.count - a.count),
     [mistakeMap],
@@ -590,6 +620,87 @@ export default function HomePage() {
     // 只在首屏读取一次服务端配置。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const entries = parseLexiconEntries(wordInput);
+    const uniqueWords = Array.from(new Set(entries.map((item) => item.en.trim()).filter(Boolean)));
+    if (!uniqueWords.length) return;
+
+    const cached = readCachedPhonetics(uniqueWords);
+    if (Object.keys(cached).length) {
+      setPhoneticMap((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        for (const [key, value] of Object.entries(cached)) {
+          if (next[key] !== value) {
+            next[key] = value;
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }
+
+    const missingWords = uniqueWords.filter((word) => !cached[getPhoneticCacheKey(word)] && !phoneticMap[getPhoneticCacheKey(word)]);
+    if (!missingWords.length || !selectedCloudProvider?.configured) return;
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      const batch = missingWords.slice(0, 20);
+      const messages = [
+        {
+          role: "system",
+          content:
+            "You provide English phonetic transcriptions for children. Return ONLY lines in the format: word=/phonetic/. Use simple IPA-like phonetics. For phrases, provide the phrase pronunciation. No explanations.",
+        },
+        {
+          role: "user",
+          content: batch.join("\n"),
+        },
+      ];
+      try {
+        const resp = await fetch("/api/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            provider: selectedCloudProvider.id,
+            model: cloudModel.trim() || selectedCloudProvider.defaultModel,
+            messages,
+            temperature: 0.1,
+            max_tokens: 500,
+          }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(data?.error?.message || `音标获取失败 (${resp.status})`);
+        const next: Record<string, string> = {};
+        String(data.choices?.[0]?.message?.content || "")
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .forEach((line) => {
+            const index = line.indexOf("=");
+            if (index <= 0) return;
+            const word = line.slice(0, index).trim();
+            const phonetic = line.slice(index + 1).trim();
+            if (!word || !phonetic) return;
+            next[word] = phonetic;
+          });
+        if (!Object.keys(next).length || cancelled) return;
+        writeCachedPhonetics(next);
+        const normalizedNext = Object.fromEntries(
+          Object.entries(next).map(([word, phonetic]) => [getPhoneticCacheKey(word), phonetic]),
+        );
+        setPhoneticMap((prev) => ({ ...prev, ...normalizedNext }));
+      } catch (err) {
+        console.warn("phonetic generation failed:", err);
+      }
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [cloudModel, phoneticMap, selectedCloudProvider, wordInput]);
 
   // 加载 WebLLM 可用模型列表
   useEffect(() => {
@@ -871,7 +982,7 @@ export default function HomePage() {
       await audio.play();
     } catch (err) {
       cleanupOpenAiAudio();
-      setFeedbackText(`云端发音失败：${(err as Error).message || "请检查服务端配置"}`);
+      setFeedbackText(`云端发音失败：${formatOpenAiUserError(err)}`);
       console.error("cloud speech playback failed:", err);
     }
   }, [
@@ -1113,7 +1224,7 @@ export default function HomePage() {
       {
         role: "system",
         content:
-          "你是小学英语老师。请用中文给小学生讲解英语单词，语言要活泼、简单、好记。输出 4 到 6 句短句，不要编号，不要 Markdown。每句尽量不超过 35 个汉字。必须包含：中文意思、发音/拼写记忆窍门、一个很简单的英文例句和中文意思、鼓励跟读。",
+          "你是小学英语老师。请用中文给小学生讲解英语单词或词组，语言要活泼、简单、好记。输出 5 到 7 句短句，不要编号，不要 Markdown。每句尽量不超过 35 个汉字。必须包含：中文意思、发音规则、拼写或画面记忆窍门、一个很简单的英文例句和中文意思、鼓励跟读。发音规则要适合小学生，说明怎么拆音节或拆词、哪个音重读、容易读错的字母组合怎么读；不要使用复杂音标，必要时用中文近似音提示。",
       },
       {
         role: "user",
@@ -1153,7 +1264,7 @@ export default function HomePage() {
               model: source.model,
               messages,
               temperature: 0.6,
-              max_tokens: 360,
+              max_tokens: 460,
             }),
           });
           const data = await resp.json().catch(() => ({}));
@@ -1169,7 +1280,7 @@ export default function HomePage() {
           const response = await llmEngine.chat.completions.create({
             messages,
             temperature: 0.6,
-            max_tokens: 360,
+            max_tokens: 460,
           });
           explanation = response.choices?.[0]?.message?.content?.trim() || "";
           writeCachedExplanation(cacheKey, explanation);
@@ -1205,7 +1316,7 @@ export default function HomePage() {
     } catch (err) {
       cleanupOpenAiAudio();
       setRobotVoiceWave((prev) => ({ ...prev, speaking: false, progress: "出错了" }));
-      setFeedbackText(`讲解失败：${(err as Error).message || "请检查 AI 或语音配置"}`);
+      setFeedbackText(`讲解失败：${formatOpenAiUserError(err)}`);
       console.error("word explanation failed:", err);
     } finally {
       setExplainingWordKey(null);
@@ -1790,6 +1901,63 @@ export default function HomePage() {
       const candidates = liveWords.filter((w) => w.status === "live");
       if (!candidates.length) return;
 
+      if (playMode === "mario_gift") {
+        const pendingId = marioPendingGiftIdRef.current;
+        const gift = pendingId ? candidates.find((word) => word.id === pendingId) : null;
+        if (!gift) return;
+
+        const target = gift.normalized;
+        const wordMatched = normalizedInputs.some((input) => {
+          const tokens = input.split(" ").filter(Boolean);
+          return (
+            input.includes(target) ||
+            target.includes(input) ||
+            similarity(input, target) >= speechMatchThreshold ||
+            tokens.some((token) => similarity(token, target) >= speechMatchThreshold)
+          );
+        });
+        const sentenceMatched = normalizedInputs.some((input) => {
+          const tokens = input.split(" ").filter((token) => /[a-z]/.test(token));
+          return tokens.length >= Math.max(4, target.split(" ").length + 2);
+        });
+
+        if (wordMatched && sentenceMatched) {
+          setWords((prev) => {
+            const updated = prev.map((word) =>
+              word.id === gift.id ? { ...word, status: "hit" as const, exploding: true } : word,
+            );
+            wordsRef.current = updated;
+            return updated;
+          });
+          window.setTimeout(() => {
+            setWords((prev) => {
+              const updated = prev.map((word) =>
+                word.id === gift.id ? { ...word, exploding: false } : word,
+              );
+              wordsRef.current = updated;
+              return updated;
+            });
+          }, 420);
+          marioPendingGiftIdRef.current = null;
+          setMarioPendingGiftId(null);
+          setCorrectCount((value) => value + 1);
+          setDoneCount((value) => value + 1);
+          setShooterHits((value) => value + 1);
+          bumpStudyHistory({ en: gift.en, zh: gift.zh }, "correct");
+          bumpBatchResult("correct");
+          emitLikeBurst();
+          setFeedbackText(`拿到礼物 ${gift.en}！句子很棒，继续前进`);
+          return;
+        }
+
+        setFeedbackText(
+          wordMatched
+            ? `已经听到 ${gift.en}，再用它造一个完整英文句子`
+            : `礼物需要先念出单词：${gift.en}`,
+        );
+        return;
+      }
+
       if (playMode === "plane_shooter") {
         let bestShooter: { word: WordItem; score: number } | null = null;
         for (const c of candidates) {
@@ -1853,7 +2021,16 @@ export default function HomePage() {
         setFeedbackText(`你说的是 "${matchedWord.en}"，本题目标是 "${target.en}"`);
       }
     },
-    [lockPlaneTarget, playMode, resolveRound, setSpellInput, speechMatchThreshold],
+    [
+      bumpBatchResult,
+      bumpStudyHistory,
+      emitLikeBurst,
+      lockPlaneTarget,
+      playMode,
+      resolveRound,
+      setSpellInput,
+      speechMatchThreshold,
+    ],
   );
 
   // ---- WebLLM: 加载模型 ----
@@ -2001,7 +2178,7 @@ export default function HomePage() {
       appendGeneratedLexicon(text);
     } catch (err) {
       console.error("LLM generation failed:", err);
-      setFeedbackText(`AI 生成失败：${(err as Error).message || "请检查模型配置"}`);
+      setFeedbackText(`AI 生成失败：${formatOpenAiUserError(err)}`);
     } finally {
       setLlmGenerating(false);
     }
@@ -2070,7 +2247,7 @@ export default function HomePage() {
       setFeedbackText(`智能识别完成，共整理 ${lines.length} 个词条`);
     } catch (err) {
       console.error("Lexicon normalization failed:", err);
-      setFeedbackText(`智能识别失败：${(err as Error).message || "请稍后重试"}`);
+      setFeedbackText(`智能识别失败：${formatOpenAiUserError(err)}`);
     } finally {
       setLexiconNormalizing(false);
     }
@@ -2128,6 +2305,9 @@ export default function HomePage() {
     const liveWords = wordsRef.current
       .filter((word) => word.status === "live")
       .map((word) => word.en);
+    const pendingMarioGift = marioPendingGiftIdRef.current
+      ? wordsRef.current.find((word) => word.id === marioPendingGiftIdRef.current)
+      : null;
     const formData = new FormData();
     formData.set("file", blob, `game-speech-${Date.now()}.webm`);
     formData.set("provider", gameSpeechEngineRef.current === "aliyun" ? "aliyun" : "openai");
@@ -2137,6 +2317,9 @@ export default function HomePage() {
       "prompt",
       [
         "A child is speaking one English word or phrase in a vocabulary game.",
+        pendingMarioGift
+          ? `The child should say the word "${pendingMarioGift.en}" and make a short English sentence using it.`
+          : "",
         "Possible answers:",
         liveWords.join(", "),
       ].join("\n"),
@@ -2200,7 +2383,7 @@ export default function HomePage() {
           const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
           void transcribeGameSpeechWithCloud(blob).catch((err) => {
             console.error("cloud game speech failed:", err);
-            setFeedbackText(`云端语音识别失败：${(err as Error).message || "请检查服务端配置"}`);
+            setFeedbackText(`云端语音识别失败：${formatOpenAiUserError(err)}`);
           });
         }
 
@@ -2255,7 +2438,11 @@ export default function HomePage() {
     // 受限识别：注入当前候选词，降低跑偏概率。
     const liveWords = wordsRef.current;
     const focusId =
-      playModeRef.current === "plane_shooter" ? planeTargetIdRef.current : targetRef.current;
+      playModeRef.current === "plane_shooter"
+        ? planeTargetIdRef.current
+        : playModeRef.current === "mario_gift"
+          ? marioPendingGiftIdRef.current
+          : targetRef.current;
     const target = liveWords.find((w) => w.id === focusId);
     const live = liveWords.filter((w) => w.status === "live");
     const grammarTerms = [
@@ -2333,6 +2520,11 @@ export default function HomePage() {
     spellTargetIdRef.current = null;
     setSpellInput([]);
     setMissingLetterCandidateMap({});
+    setMarioPendingGiftId(null);
+    marioPendingGiftIdRef.current = null;
+    setMarioJumpY(0);
+    marioJumpYRef.current = 0;
+    marioJumpVelocityRef.current = 0;
     currentBatchIdRef.current = null;
     lastFrameTsRef.current = null;
     clearRaf();
@@ -2425,12 +2617,62 @@ export default function HomePage() {
         });
       }
 
+      if (mode === "mario_gift") {
+        const gifts = wordsRef.current;
+        const worldWidth = Math.max(520, gifts.length * 170 + 180);
+        const isWaitingForGift = Boolean(marioPendingGiftIdRef.current);
+        const nextPlayerX = isWaitingForGift
+          ? marioPlayerXRef.current
+          : Math.min(worldWidth, marioPlayerXRef.current + 86 * deltaSec);
+        marioPlayerXRef.current = nextPlayerX;
+        setMarioPlayerX(nextPlayerX);
+
+        const wasJumpingUp = marioJumpVelocityRef.current > 0;
+        if (marioJumpYRef.current > 0 || marioJumpVelocityRef.current > 0) {
+          const nextVelocity = marioJumpVelocityRef.current - 720 * deltaSec;
+          const nextJumpY = Math.max(0, marioJumpYRef.current + nextVelocity * deltaSec);
+          marioJumpVelocityRef.current = nextJumpY <= 0 ? 0 : nextVelocity;
+          marioJumpYRef.current = nextJumpY;
+          setMarioJumpY(nextJumpY);
+        }
+
+        if (!isWaitingForGift) {
+          const bumpedGift = gifts.find(
+            (gift) =>
+              gift.status === "live" &&
+              !gift.revealedEn &&
+              Math.abs(gift.x - nextPlayerX) <= 34 &&
+              wasJumpingUp &&
+              marioJumpYRef.current >= 58,
+          );
+          if (bumpedGift) {
+            setWords((prev) => {
+              const updated = prev.map((word) =>
+                word.id === bumpedGift.id ? { ...word, revealedEn: true } : word,
+              );
+              wordsRef.current = updated;
+              return updated;
+            });
+            marioPendingGiftIdRef.current = bumpedGift.id;
+            setMarioPendingGiftId(bumpedGift.id);
+            marioJumpVelocityRef.current = -120;
+            setFeedbackText(`顶出了礼物：先念 ${bumpedGift.en}，再用它造一个英文句子`);
+            setRecognizedText(`礼物单词：${bumpedGift.en} = ${bumpedGift.zh}`);
+          }
+        }
+      }
+
       setWords((prev) => {
         let hasLive = false;
         let targetDropped = false;
 
         const updated: WordItem[] = prev.map((w) => {
           if (w.status !== "live") return w;
+
+          if (mode === "mario_gift") {
+            hasLive = true;
+            return w;
+          }
 
           let nextX = w.x + w.vx * deltaSec;
           const areaW = gameAreaRef.current?.clientWidth ?? 900;
@@ -2552,14 +2794,17 @@ export default function HomePage() {
             ? spellChallengeMode === "missing_letters"
               ? "看单词缺失字母提示，输入缺失字母后按回车确认"
               : "看中文提示，在键盘上拼出正确的英文单词，按回车确认"
-            : planeDropChineseOnly
-              ? "中文下落模式：直接说英文，目标会变红；再用左右键移动、上方向键发射"
-              : "直接说出单词锁定红色目标，再用左右键移动飞机、上方向键发射",
+            : playMode === "mario_gift"
+              ? "超级玛丽出发！碰到礼物后，念出单词并造一个英文句子"
+              : planeDropChineseOnly
+                ? "中文下落模式：直接说英文，目标会变红；再用左右键移动、上方向键发射"
+                : "直接说出单词锁定红色目标，再用左右键移动飞机、上方向键发射",
     );
     setRecognizedText("");
     setShooterHits(0);
     setBullets([]);
     setPlaneTargetId(null);
+    setMarioPendingGiftId(null);
     setSpellTargetId(null);
     spellTargetIdRef.current = null;
     setSpellInput([]);
@@ -2570,6 +2815,12 @@ export default function HomePage() {
     leftPressedRef.current = false;
     rightPressedRef.current = false;
     lastFireTsRef.current = 0;
+    marioPendingGiftIdRef.current = null;
+    marioPlayerXRef.current = 40;
+    marioJumpYRef.current = 0;
+    marioJumpVelocityRef.current = 0;
+    setMarioPlayerX(40);
+    setMarioJumpY(0);
     playModeRef.current = playMode;
     fallHeightRef.current = fallHeightPx;
     const areaW = gameAreaRef.current?.clientWidth ?? 900;
@@ -2581,6 +2832,16 @@ export default function HomePage() {
     const baseSpeed = fallDistance / safeRoundSeconds;
     const revealByDefault = !(playMode === "plane_shooter" && planeDropChineseOnly);
     const syncedWords = parsed.map((w, idx) => {
+      if (playMode === "mario_gift") {
+        return {
+          ...w,
+          revealedEn: false,
+          x: 140 + idx * 170,
+          y: 0,
+          vx: 0,
+          speed: 0,
+        };
+      }
       if (playMode === "plane_shooter" || playMode === "spell_word") {
         const laneX = ((idx % 8) + 1) * (areaW / 9);
         const vx = (Math.random() < 0.5 ? -1 : 1) * (40 + Math.random() * 120);
@@ -2609,6 +2870,12 @@ export default function HomePage() {
       askingRef.current = true;
       setCountdownMs(0);
       pickNextSpellTarget(syncedWords);
+    } else if (playMode === "mario_gift") {
+      askingRef.current = true;
+      targetRef.current = null;
+      setTargetId(null);
+      setRecognizedText("马里奥正在前进，遇到礼物后请直接说英文");
+      setCountdownMs(0);
     } else {
       askingRef.current = true;
       targetRef.current = null;
@@ -2617,8 +2884,8 @@ export default function HomePage() {
       setCountdownMs(0);
     }
 
-    // 释义匹配与飞机射击都全程自动监听；拼写模式不需要语音识别。
-    if (playMode === "voice_match" || playMode === "plane_shooter") {
+    // 语音类模式全程自动监听；拼写模式不需要语音识别。
+    if (playMode === "voice_match" || playMode === "plane_shooter" || playMode === "mario_gift") {
       autoListenRef.current = true;
       startSpeech();
     }
@@ -2724,6 +2991,15 @@ export default function HomePage() {
       }
 
       if (event.code === "ArrowLeft" || event.code === "ArrowRight" || event.code === "ArrowUp") {
+        if (gameState === "running" && playMode === "mario_gift" && event.code === "ArrowUp") {
+          event.preventDefault();
+          if (!event.repeat && marioJumpYRef.current <= 0) {
+            marioJumpVelocityRef.current = 360;
+            marioJumpYRef.current = 1;
+            setMarioJumpY(1);
+          }
+          return;
+        }
         if (gameState !== "running" || playMode !== "plane_shooter") return;
         event.preventDefault();
         if (event.code === "ArrowLeft") {
@@ -2745,8 +3021,8 @@ export default function HomePage() {
       if (event.code !== "Space") return;
       if (event.repeat) return;
       event.preventDefault();
-      // 释义匹配和飞机射击都始终自动监听，不需要按空格。
-      if (playMode === "voice_match" || playMode === "plane_shooter") return;
+      // 语音类模式都始终自动监听，不需要按空格。
+      if (playMode === "voice_match" || playMode === "plane_shooter" || playMode === "mario_gift") return;
       const canListen =
         gameState === "running" &&
         (askingRef.current && Boolean(targetRef.current));
@@ -2771,8 +3047,8 @@ export default function HomePage() {
 
       if (event.code !== "Space") return;
       event.preventDefault();
-      // 释义匹配和飞机射击都始终自动监听，不需要按空格。
-      if (playMode === "voice_match" || playMode === "plane_shooter") return;
+      // 语音类模式都始终自动监听，不需要按空格。
+      if (playMode === "voice_match" || playMode === "plane_shooter" || playMode === "mario_gift") return;
       spaceHoldRef.current = false;
       setIsHoldingSpace(false);
       stopSpeech();
@@ -2814,6 +3090,11 @@ export default function HomePage() {
 
   const accuracy = totalCount ? Math.round((correctCount / totalCount) * 100) : 0;
   const score = Math.max(1, Math.round(accuracy / 10));
+  const marioCameraX = Math.max(0, marioPlayerX - 150);
+  const marioPendingGift = marioPendingGiftId
+    ? words.find((word) => word.id === marioPendingGiftId)
+    : null;
+  const feedbackIsError = /失败|错误|无法|未配置|不可用|请先配置|访问限制/.test(feedbackText);
 
   return (
     <main className="game-bg min-h-screen text-slate-100">
@@ -2832,6 +3113,25 @@ export default function HomePage() {
       />
       {false && showBrowserWarning && (
         <BrowserWarning onClose={() => setShowBrowserWarning(false)} />
+      )}
+      {feedbackIsError && (
+        <div className="fixed left-1/2 top-1/2 z-[120] w-[min(92vw,460px)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-rose-300/50 bg-rose-950/95 p-5 text-rose-50 shadow-2xl shadow-rose-950/50 backdrop-blur-md">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 text-lg">!</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold">操作没有成功</p>
+              <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-rose-50/90">{feedbackText}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setFeedbackText("")}
+              className="rounded-md px-2 py-0.5 text-sm text-rose-100/70 transition hover:bg-white/10 hover:text-white"
+              aria-label="关闭错误提示"
+            >
+              ×
+            </button>
+          </div>
+        </div>
       )}
       <div className="mx-auto max-w-6xl px-3 pb-8 pt-4 sm:px-4 sm:pt-6 md:px-6 md:pt-8">
         <AppHeader llmStatus={llmStatus} onOpenChat={() => setLlmChatOpen(true)} />
@@ -2959,7 +3259,13 @@ export default function HomePage() {
                 <div className="flex items-center justify-between gap-2 sm:justify-self-start">
                   <div>
                     <p className="text-xs font-semibold text-indigo-100 sm:text-sm">
-                      {playMode === "voice_match" ? "释义匹配" : playMode === "spell_word" ? "拼单词" : "飞机射击"}
+                      {playMode === "voice_match"
+                        ? "释义匹配"
+                        : playMode === "spell_word"
+                          ? "拼单词"
+                          : playMode === "mario_gift"
+                            ? "超级玛丽"
+                            : "飞机射击"}
                     </p>
                     <p className="hidden text-xs text-indigo-200/80 sm:block">
                       {gameState === "running"
@@ -2967,7 +3273,9 @@ export default function HomePage() {
                           ? "用键盘拼出正确单词，按回车确认"
                           : playMode === "voice_match"
                             ? "语音识别已开启，请直接说英文"
-                            : "游戏进行中（自动语音识别）"
+                            : playMode === "mario_gift"
+                              ? "碰到礼物后，念单词并造句"
+                              : "游戏进行中（自动语音识别）"
                         : "可开始新一局或查看本局成绩"}
                     </p>
                   </div>
@@ -3061,6 +3369,172 @@ export default function HomePage() {
                   ))}
                 </div>
 
+                {playMode === "mario_gift" ? (
+                  <>
+                    <div className="absolute inset-0 z-0 bg-[#5da8ff]" />
+                    <div className="absolute left-4 right-4 top-3 z-[12] flex justify-between font-mono text-[11px] font-black uppercase tracking-[0.22em] text-white drop-shadow-[2px_2px_0_rgba(0,0,0,0.75)] sm:text-base">
+                      <div>
+                        <p>MARIO</p>
+                        <p>{String(shooterHits * 100).padStart(6, "0")}</p>
+                      </div>
+                      <div>
+                        <p>COINS</p>
+                        <p>×{String(shooterHits).padStart(2, "0")}</p>
+                      </div>
+                      <div>
+                        <p>WORLD</p>
+                        <p>1-1</p>
+                      </div>
+                      <div>
+                        <p>GIFTS</p>
+                        <p>{shooterHits}/{totalCount || words.length}</p>
+                      </div>
+                    </div>
+                    <div
+                      className="pointer-events-none absolute bottom-[104px] z-[1] h-40 w-72 rounded-t-full bg-green-500"
+                      style={{ left: `${520 - marioCameraX * 0.35}px` }}
+                    >
+                      <span className="absolute left-14 top-10 h-3 w-3 rounded-full bg-lime-100" />
+                      <span className="absolute left-32 top-7 h-4 w-4 rounded-full bg-lime-100" />
+                      <span className="absolute right-14 top-16 h-3 w-3 rounded-full bg-lime-100" />
+                    </div>
+                    <div
+                      className="pointer-events-none absolute bottom-[104px] z-[1] h-20 w-40 rounded-t-full bg-lime-500"
+                      style={{ left: `${1050 - marioCameraX * 0.4}px` }}
+                    />
+                    {[
+                      { left: 70, top: 88, scale: 1 },
+                      { left: 430, top: 76, scale: 0.85 },
+                      { left: 860, top: 96, scale: 1.05 },
+                    ].map((cloud, index) => (
+                      <div
+                        key={index}
+                        className="pointer-events-none absolute z-[1] h-7 w-20 rounded-full bg-white shadow-[18px_-10px_0_2px_white,38px_0_0_0_white]"
+                        style={{
+                          left: `${cloud.left - marioCameraX * 0.18}px`,
+                          top: `${cloud.top}px`,
+                          transform: `scale(${cloud.scale})`,
+                        }}
+                      />
+                    ))}
+                    <div
+                      className="pointer-events-none absolute bottom-[112px] z-[2]"
+                      style={{ left: `${760 - marioCameraX}px` }}
+                    >
+                      <div className="h-20 w-16 rounded-t-lg border-4 border-green-900 bg-gradient-to-r from-green-600 via-lime-400 to-green-600 shadow-lg" />
+                      <div className="-ml-2 -mt-24 h-8 w-20 rounded border-4 border-green-900 bg-gradient-to-r from-green-700 via-lime-300 to-green-700" />
+                    </div>
+                    <div
+                      className="pointer-events-none absolute bottom-[112px] z-[2]"
+                      style={{ left: `${1250 - marioCameraX}px` }}
+                    >
+                      <div className="h-28 w-3 bg-lime-100 shadow-[2px_0_0_rgba(0,0,0,0.35)]" />
+                      <div className="absolute left-3 top-2 h-9 w-14 rounded-r bg-red-500 shadow">
+                        <span className="absolute left-1 top-3 text-[10px] font-black text-white">END</span>
+                      </div>
+                    </div>
+                    <div
+                      className="pointer-events-none absolute bottom-[112px] z-[2] h-20 w-24 border-4 border-stone-800 bg-gradient-to-b from-amber-500 to-orange-800 shadow-lg"
+                      style={{ left: `${1360 - marioCameraX}px` }}
+                    >
+                      <div className="absolute -top-8 left-2 h-8 w-5 bg-orange-700" />
+                      <div className="absolute -top-8 right-2 h-8 w-5 bg-orange-700" />
+                      <div className="absolute bottom-0 left-1/2 h-10 w-8 -translate-x-1/2 rounded-t-full bg-stone-900" />
+                    </div>
+                    <div className="absolute inset-x-0 bottom-0 z-[1] h-28 border-t-4 border-orange-950/70 bg-[linear-gradient(0deg,#b45309_0_45%,#d97706_45%_50%,#92400e_50%_100%)]" />
+                    <div
+                      className="pointer-events-none absolute bottom-[112px] z-[2] flex gap-2"
+                      style={{ left: `${-marioCameraX}px`, width: `${Math.max(700, words.length * 170 + 280)}px` }}
+                    >
+                      {Array.from({ length: Math.max(12, words.length + 8) }).map((_, idx) => (
+                        <span
+                          key={idx}
+                          className="h-9 w-16 border border-orange-950/80 bg-gradient-to-b from-orange-400 to-orange-700 shadow-[inset_0_-4px_0_rgba(0,0,0,0.25)]"
+                        />
+                      ))}
+                    </div>
+                    <div
+                      className="pointer-events-none absolute bottom-[246px] z-[2] flex gap-1"
+                      style={{ left: `${360 - marioCameraX}px` }}
+                    >
+                      {Array.from({ length: 5 }).map((_, index) => (
+                        <span
+                          key={index}
+                          className="h-10 w-12 border border-orange-950 bg-gradient-to-b from-orange-500 to-orange-800 shadow-[inset_0_-3px_0_rgba(0,0,0,0.25)]"
+                        />
+                      ))}
+                    </div>
+                    <div
+                      className="pointer-events-none absolute bottom-[174px] z-[2]"
+                      style={{ left: `${260 - marioCameraX}px` }}
+                    >
+                      <div className="flex items-end gap-1">
+                        {[0, 1, 2].map((col) => (
+                          <div key={col} className="flex flex-col-reverse gap-1">
+                            {Array.from({ length: col + 1 }).map((_, row) => (
+                              <span
+                                key={row}
+                                className="h-10 w-12 border border-orange-950 bg-gradient-to-b from-orange-400 to-orange-800 shadow"
+                              />
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {[620, 960].map((left, index) => (
+                      <div
+                        key={index}
+                        className="pointer-events-none absolute bottom-[126px] z-[2]"
+                        style={{ left: `${left - marioCameraX}px` }}
+                      >
+                        <div className="relative h-10 w-12">
+                          <div className="absolute bottom-0 h-6 w-12 rounded-t-full bg-amber-700" />
+                          <div className="absolute bottom-5 left-1 h-5 w-10 rounded-t-full bg-amber-600" />
+                          <span className="absolute bottom-3 left-3 h-1.5 w-1.5 rounded-full bg-black" />
+                          <span className="absolute bottom-3 right-3 h-1.5 w-1.5 rounded-full bg-black" />
+                          <span className="absolute bottom-0 left-1 h-2 w-3 rounded bg-amber-950" />
+                          <span className="absolute bottom-0 right-1 h-2 w-3 rounded bg-amber-950" />
+                        </div>
+                      </div>
+                    ))}
+                    {marioPendingGift ? (
+                      <div className="absolute left-1/2 top-4 z-[12] w-[min(92vw,520px)] -translate-x-1/2 rounded-2xl border border-amber-300/50 bg-slate-950/90 p-4 text-center shadow-2xl shadow-amber-500/20 backdrop-blur">
+                        <p className="text-xs font-semibold text-amber-200/80">礼物挑战</p>
+                        <p className="mt-1 text-3xl font-black text-amber-100">{marioPendingGift.en}</p>
+                        <p className="mt-1 text-sm text-indigo-100/80">{marioPendingGift.zh}</p>
+                        <p className="mt-2 text-xs text-emerald-100/80">
+                          请说出这个单词，并用它造一个英文句子。例如：{marioPendingGift.en} is important.
+                        </p>
+                      </div>
+                    ) : null}
+                    <div
+                      className="pointer-events-none absolute bottom-[112px] z-[4] text-5xl drop-shadow-[0_8px_12px_rgba(0,0,0,0.35)] transition-transform"
+                      style={{
+                        left: `${Math.max(36, Math.min(150, marioPlayerX - marioCameraX))}px`,
+                        transform: `translateY(${-marioJumpY}px)`,
+                      }}
+                    >
+                      <div className="relative h-20 w-12">
+                        <div className="absolute left-1/2 top-0 h-5 w-10 -translate-x-1/2 rounded-t-full bg-red-600 shadow-[inset_0_-3px_0_rgba(0,0,0,0.25)]" />
+                        <div className="absolute left-0 top-4 h-2 w-10 rounded bg-red-700" />
+                        <div className="absolute left-1 top-5 h-7 w-9 rounded bg-amber-200 shadow">
+                          <span className="absolute left-6 top-2 h-1.5 w-1.5 rounded-full bg-slate-900" />
+                          <span className="absolute left-1 top-3 h-2 w-5 rounded-full bg-red-300/70" />
+                          <span className="absolute -right-1 top-4 h-1.5 w-4 rounded bg-amber-300" />
+                        </div>
+                        <div className="absolute left-2 top-11 h-8 w-8 rounded-md bg-blue-600 shadow">
+                          <span className="absolute -left-3 top-1 h-5 w-3 rounded-full bg-red-600" />
+                          <span className="absolute -right-3 top-1 h-5 w-3 rounded-full bg-red-600" />
+                          <span className="absolute left-1 top-0 h-2.5 w-2 rounded-full bg-yellow-300" />
+                          <span className="absolute right-1 top-0 h-2.5 w-2 rounded-full bg-yellow-300" />
+                        </div>
+                        <div className="absolute left-1 top-[74px] h-3 w-5 rounded bg-amber-900" />
+                        <div className="absolute right-0 top-[74px] h-3 w-5 rounded bg-amber-900" />
+                      </div>
+                    </div>
+                  </>
+                ) : null}
+
                 {playMode === "plane_shooter" ? (
                   <>
                     {bullets.map((b) => (
@@ -3088,6 +3562,8 @@ export default function HomePage() {
                     playMode === "plane_shooter" && planeTargetId === word.id && word.status === "live";
                   const isSpellTarget =
                     playMode === "spell_word" && spellTargetId === word.id && word.status === "live";
+                  const isMarioGift =
+                    playMode === "mario_gift" && marioPendingGiftId === word.id && word.status === "live";
                   const baseClass =
                     word.status === "missed"
                       ? "border-rose-200/70 text-rose-100 opacity-55"
@@ -3095,7 +3571,9 @@ export default function HomePage() {
 
                   // Determine displayed text
                   let displayText: string;
-                  if (playMode === "spell_word") {
+                  if (playMode === "mario_gift") {
+                    displayText = word.revealedEn ? `🎁 ${word.en}` : "?";
+                  } else if (playMode === "spell_word") {
                     if (word.spellUnlocked || word.status === "hit") {
                       displayText = word.en;
                     } else if (word.spellChallengeMode === "missing_letters") {
@@ -3126,16 +3604,38 @@ export default function HomePage() {
                       title={spellClickable ? `点击朗读：${word.en}` : undefined}
                       className={[
                         "absolute top-0 rounded-xl border px-3 py-1.5 text-lg font-bold tracking-wide shadow",
-                        isPlaneTarget ? "bg-rose-900/90" : isSpellTarget ? "bg-amber-900/90" : "bg-blue-950/90",
+                        isMarioGift
+                          ? word.revealedEn
+                            ? "bg-amber-900/95 text-amber-50"
+                            : "bg-yellow-400 text-yellow-950"
+                          : isPlaneTarget
+                            ? "bg-rose-900/90"
+                            : isSpellTarget
+                              ? "bg-amber-900/90"
+                              : "bg-blue-950/90",
                         baseClass,
                         isVoiceTarget ? "border-emerald-300 shadow-emerald-400/30" : "",
                         isPlaneTarget ? "border-rose-300 shadow-rose-400/30" : "",
                         isSpellTarget ? "border-amber-300 shadow-amber-400/40" : "",
+                        isMarioGift
+                          ? word.revealedEn
+                            ? "border-amber-200 shadow-amber-300/40 animate-pulse"
+                            : "border-yellow-200 text-yellow-950 shadow-yellow-300/40"
+                          : "",
                         word.spellUnlocked ? "border-emerald-400 bg-emerald-900/80" : "",
                         word.exploding ? "animate-boom" : "",
                         spellClickable ? "cursor-pointer hover:brightness-125 transition" : "",
                       ].join(" ")}
-                      style={{ left: `${word.x}px`, transform: `translateY(${word.y}px)` }}
+                      style={
+                        playMode === "mario_gift"
+                          ? {
+                              left: `${word.x - marioCameraX}px`,
+                              top: "auto",
+                              bottom: word.revealedEn ? "236px" : "238px",
+                              transform: word.exploding ? undefined : "translateY(0)",
+                            }
+                          : { left: `${word.x}px`, transform: `translateY(${word.y}px)` }
+                      }
                     >
                       {playMode === "spell_word" && isSpellTarget && word.spellChallengeMode === "missing_letters" ? (
                         <span className="flex items-center gap-1">
@@ -3423,6 +3923,8 @@ export default function HomePage() {
                               <p className="mt-2 text-indigo-100">正确 {correctCount} / {totalCount}</p>
                               <p className="mt-1 text-indigo-100">准确率：{accuracy}%</p>
                             </>
+                          ) : playMode === "mario_gift" ? (
+                            <p className="mt-2 text-indigo-100">拿到礼物 {shooterHits} / {totalCount}</p>
                           ) : (
                             <p className="mt-2 text-indigo-100">击中 {shooterHits} / {totalCount}</p>
                           )}
@@ -3464,6 +3966,12 @@ export default function HomePage() {
                             <>
                               <p className="mt-2 text-indigo-100">看到中文后，在限时内直接说出对应英文。</p>
                               <p className="mt-1 text-indigo-100">匹配成功时单词会爆炸消失，全部完成后自动评分。</p>
+                            </>
+                          ) : playMode === "mario_gift" ? (
+                            <>
+                              <p className="mt-2 text-indigo-100">马里奥会自动前进，看到问号石块时按上方向键跳起来顶一下。</p>
+                              <p className="mt-1 text-indigo-100">礼物会从石块里弹出，请先念出单词，再用它造一个英文句子。</p>
+                              <p className="mt-1 text-indigo-100">成功后礼物到手，马里奥继续前进。</p>
                             </>
                           ) : (
                             <>

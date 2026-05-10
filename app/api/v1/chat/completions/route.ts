@@ -4,6 +4,7 @@ import {
   errorJson,
   CORS_HEADERS,
   describeFetchError,
+  openAiUserFriendlyError,
 } from "@/lib/openai";
 
 export const runtime = "nodejs";
@@ -62,7 +63,9 @@ export async function POST(req: Request) {
       const errText = await upstream.text().catch(() => "unknown error");
       console.error(`${config.label} chat upstream error:`, upstream.status, errText);
       return errorJson(
-        `上游 API 错误 (${upstream.status})`,
+        config.id === "openai"
+          ? openAiUserFriendlyError(`接口返回 ${upstream.status}`)
+          : `上游 API 错误 (${upstream.status})`,
         upstream.status >= 400 && upstream.status < 500 ? upstream.status : 502,
       );
     }
@@ -85,6 +88,9 @@ export async function POST(req: Request) {
     return Response.json(data, { headers: CORS_HEADERS });
   } catch (err) {
     console.error("chat completions error:", err);
-    return errorJson(describeFetchError(err, config.label), 502);
+    return errorJson(
+      config.id === "openai" ? openAiUserFriendlyError(describeFetchError(err, "OpenAI")) : describeFetchError(err, config.label),
+      502,
+    );
   }
 }

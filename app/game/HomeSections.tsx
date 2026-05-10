@@ -380,7 +380,7 @@ export function LexiconAndStartPanel({
                 )}
               </div>
             </div>
-            <div className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto pr-1">
+            <div className="flex flex-wrap gap-1.5 pr-1">
               {lexiconLabels.map((item, idx) => (
                 <span
                   key={`${item.en}-${item.zh}-${idx}`}
@@ -392,7 +392,12 @@ export function LexiconAndStartPanel({
                     className="px-2 py-0.5 transition hover:bg-cyan-400/25"
                     title={`点击发音：${item.en}`}
                   >
-                    {item.en}
+                    <span>{item.en}</span>
+                    {item.phonetic && (
+                      <span className="ml-1 text-[10px] font-normal text-cyan-100/65">
+                        {item.phonetic}
+                      </span>
+                    )}
                   </button>
                   <button
                     type="button"
@@ -416,7 +421,13 @@ export function LexiconAndStartPanel({
           <p className="text-xs text-indigo-200/70">
             当前模式：
             <span className="ml-1 font-semibold text-emerald-200">
-              {playMode === "voice_match" ? "释义匹配" : playMode === "spell_word" ? "拼单词" : "飞机射击"}
+              {playMode === "voice_match"
+                ? "释义匹配"
+                : playMode === "spell_word"
+                  ? "拼单词"
+                  : playMode === "mario_gift"
+                    ? "超级玛丽"
+                    : "飞机射击"}
             </span>
           </p>
           <p className="mt-0.5 text-xs text-indigo-200/70">
@@ -449,7 +460,7 @@ export function LexiconAndStartPanel({
               <span>中文下落模式：下落词条显示中文，仍需说出对应英文</span>
             </label>
           )}
-          {(playMode === "voice_match" || playMode === "plane_shooter") && (
+          {(playMode === "voice_match" || playMode === "plane_shooter" || playMode === "mario_gift") && (
             <div className="mt-3 rounded-xl border border-cyan-300/20 bg-cyan-500/5 p-3">
               <p className="mb-2 text-xs font-semibold text-cyan-100/90">语音识别方式</p>
               <div className="grid gap-2 sm:grid-cols-2">
@@ -552,6 +563,12 @@ export function LexiconAndStartPanel({
               <>
                 <p>· 游戏中会自动识别语音，直接说英文锁定红色目标</p>
                 <p>· 左右方向键移动，上键发射子弹</p>
+              </>
+            )}
+            {playMode === "mario_gift" && (
+              <>
+                <p>· 按上方向键跳起，用头顶问号石块，礼物会从石块里出现</p>
+                <p>· 念出礼物单词，并用它造一个英文句子，礼物才会到手</p>
               </>
             )}
             {playMode === "spell_word" && (
